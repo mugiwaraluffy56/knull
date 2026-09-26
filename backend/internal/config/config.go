@@ -57,10 +57,8 @@ type Config struct {
 	TrueForgeURL string
 	// TrueForgeToken authenticates requests to TrueForge.
 	TrueForgeToken string
-	// These select a dedicated sandbox-only validation agent and connector.
+	// This selects the TrueForge model that authors EKS validation code.
 	TrueForgeValidationModel string
-	TrueForgeValidationMCP   string
-	TrueForgeValidationTools []string
 
 	// K8sMCPURL / K8sMCPToken address the read-only Kubernetes MCP server.
 	K8sMCPURL   string
@@ -79,6 +77,7 @@ type Config struct {
 	SandboxClusterUID      string
 	ProductionClusterUIDs  []string
 	SandboxImageRegistry   string
+	SandboxCodeImageDigest string
 	SandboxPullSecretName  string
 	SandboxPrometheusURL   string
 	SandboxPrometheusToken string
@@ -135,7 +134,6 @@ func Load() (Config, error) {
 		TrueForgeURL:             os.Getenv("KNULL_TRUEFORGE_URL"),
 		TrueForgeToken:           os.Getenv("KNULL_TRUEFORGE_TOKEN"),
 		TrueForgeValidationModel: os.Getenv("KNULL_TRUEFORGE_VALIDATION_MODEL"),
-		TrueForgeValidationMCP:   os.Getenv("KNULL_TRUEFORGE_VALIDATION_MCP"),
 		K8sMCPURL:                os.Getenv("KNULL_K8S_MCP_URL"),
 		K8sMCPToken:              os.Getenv("KNULL_K8S_MCP_TOKEN"),
 		PrometheusMCPURL:         os.Getenv("KNULL_PROMETHEUS_MCP_URL"),
@@ -149,6 +147,7 @@ func Load() (Config, error) {
 		SandboxClusterUID:        os.Getenv("KNULL_SANDBOX_CLUSTER_UID"),
 		ProductionClusterUIDs:    strings.Split(os.Getenv("KNULL_PRODUCTION_CLUSTER_UIDS"), ","),
 		SandboxImageRegistry:     os.Getenv("KNULL_SANDBOX_IMAGE_REGISTRY"),
+		SandboxCodeImageDigest:   os.Getenv("KNULL_SANDBOX_CODE_IMAGE_DIGEST"),
 		SandboxPullSecretName:    os.Getenv("KNULL_SANDBOX_PULL_SECRET_NAME"),
 		SandboxPrometheusURL:     os.Getenv("KNULL_SANDBOX_PROMETHEUS_URL"),
 		SandboxPrometheusToken:   os.Getenv("KNULL_SANDBOX_PROMETHEUS_TOKEN"),
@@ -168,11 +167,6 @@ func Load() (Config, error) {
 	}
 	if c.ProductionExecutionEnabled && (c.ProductionCluster == "" || c.ProductionNamespace == "" || c.ProductionWorkload == "" || len(c.ProductionCASHA256) != 64) {
 		return Config{}, fmt.Errorf("production execution requires exact cluster, namespace, workload, and 64-character CA SHA256")
-	}
-	if raw := os.Getenv("KNULL_TRUEFORGE_VALIDATION_TOOLS"); raw != "" {
-		for _, tool := range strings.Split(raw, ",") {
-			c.TrueForgeValidationTools = append(c.TrueForgeValidationTools, strings.TrimSpace(tool))
-		}
 	}
 	if raw := os.Getenv("KNULL_JEV_MIN_CONFIDENCE"); raw != "" {
 		value, err := strconv.ParseFloat(raw, 64)

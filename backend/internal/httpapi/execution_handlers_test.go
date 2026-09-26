@@ -17,6 +17,10 @@ func (s *stubExecutor) Execute(context.Context, uuid.UUID, uuid.UUID, string) (e
 	s.calls++
 	return executor.Receipt{RequestID: "request-1", Status: executor.Completed}, nil
 }
+func (s *stubExecutor) Reconcile(context.Context, uuid.UUID, uuid.UUID, string) (executor.Receipt, error) {
+	s.calls++
+	return executor.Receipt{RequestID: "request-2", Status: executor.Completed}, nil
+}
 
 func TestExecuteMemoryDisabledByDefault(t *testing.T) {
 	s := New(Options{AllowedOrigin: "http://localhost:3000"})

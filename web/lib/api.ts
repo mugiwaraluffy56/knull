@@ -136,6 +136,34 @@ export async function fetchFleet(): Promise<FleetResult> {
 
 export type Service = components["schemas"]["Service"];
 export type ServiceInput = components["schemas"]["ServiceInput"];
+export type RecoveryPolicy = components["schemas"]["RecoveryPolicy"];
+export type RecoveryPolicySnapshot = components["schemas"]["RecoveryPolicySnapshot"];
+
+export async function fetchRecoveryPolicy(serviceId: string): Promise<RecoveryPolicySnapshot | null> {
+  const res = await fetch(`${API_BASE_URL}/api/services/${serviceId}/recovery-policy`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`could not load recovery policy (${res.status})`);
+  return (await res.json()) as RecoveryPolicySnapshot;
+}
+
+export async function putRecoveryPolicy(serviceId: string, policy: RecoveryPolicy): Promise<{ policy?: RecoveryPolicySnapshot; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/services/${serviceId}/recovery-policy`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(policy),
+    });
+    if (res.ok) return { policy: (await res.json()) as RecoveryPolicySnapshot };
+    const body = (await res.json()) as { error?: string };
+    return { error: body.error ?? `request failed (${res.status})` };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "request failed" };
+  }
+}
 
 export interface ServicesResult {
   authenticated: boolean;

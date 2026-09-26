@@ -31,7 +31,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["batch"]
     resources: ["jobs"]
-    verbs: ["create", "get"]
+    verbs: ["create", "get", "patch"]
   - apiGroups: [""]
     resources: ["resourcequotas", "limitranges"]
     verbs: ["get", "create", "patch"]

@@ -31,11 +31,15 @@ func (g *fakeGate) ClaimForExecution(_ context.Context, _, _ uuid.UUID, _ string
 type fakeClient struct {
 	action   actions.Contract
 	patchErr error
+	readErr  error
 	patches  int
 	live     actions.Preconditions
 }
 
 func (c *fakeClient) ReadPreconditions(context.Context, actions.Target, string) (actions.Preconditions, error) {
+	if c.readErr != nil {
+		return actions.Preconditions{}, c.readErr
+	}
 	return c.live, nil
 }
 func (c *fakeClient) PatchMemory(context.Context, actions.Contract) (*appsv1.Deployment, json.RawMessage, error) {
@@ -43,12 +47,18 @@ func (c *fakeClient) PatchMemory(context.Context, actions.Contract) (*appsv1.Dep
 	if c.patchErr != nil {
 		return nil, json.RawMessage(`[{"op":"replace"}]`), c.patchErr
 	}
+	c.live = actions.Preconditions{ResourceUID: c.action.Preconditions.ResourceUID, ResourceVersion: "9124", CurrentValue: c.action.DesiredValue}
 	return deployment(c.action), json.RawMessage(`[{"op":"replace"}]`), nil
 }
 
 type fakeHistory struct {
 	events      []incidents.EventInput
+	stored      []incidents.Event
 	transitions []incidents.Transition
+}
+
+func (h *fakeHistory) Events(context.Context, uuid.UUID) ([]incidents.Event, error) {
+	return h.stored, nil
 }
 
 func (h *fakeHistory) Get(context.Context, uuid.UUID) (incidents.Incident, error) {
@@ -80,7 +90,7 @@ func TestExecuteRecordsCompletedOnlyAfterLiveValue(t *testing.T) {
 	client := &fakeClient{action: action, live: actions.Preconditions{ResourceUID: action.Preconditions.ResourceUID, ResourceVersion: "9124", CurrentValue: "1Gi"}}
 	history := &fakeHistory{}
 	receipt, err := (Service{Gate: gate, Client: client, History: history}).Execute(context.Background(), uuid.New(), uuid.New(), action.Digest)
-	if err != nil || receipt.Status != Completed || gate.claims != 1 || client.patches != 1 || len(history.events) != 1 || len(history.transitions) != 1 || history.transitions[0].To != incidents.StateVerifying {
+	if err != nil || receipt.Status != Completed || gate.claims != 1 || client.patches != 1 || len(history.events) != 3 || len(history.transitions) != 1 || history.transitions[0].To != incidents.StateVerifying {
 		t.Fatalf("completion: %v %+v %+v %+v", err, receipt, gate, history)
 	}
 }
@@ -91,7 +101,7 @@ func TestExecuteLeavesAmbiguousWriteForReconciliation(t *testing.T) {
 	client := &fakeClient{action: action, patchErr: context.DeadlineExceeded}
 	history := &fakeHistory{}
 	receipt, err := (Service{Gate: gate, Client: client, History: history}).Execute(context.Background(), uuid.New(), uuid.New(), action.Digest)
-	if !errors.Is(err, context.DeadlineExceeded) || receipt.Status != Unknown || len(history.events) != 1 || len(history.transitions) != 0 {
+	if !errors.Is(err, context.DeadlineExceeded) || receipt.Status != Unknown || len(history.events) != 2 || len(history.transitions) != 0 {
 		t.Fatalf("ambiguous result: %v %+v %+v", err, receipt, history)
 	}
 }

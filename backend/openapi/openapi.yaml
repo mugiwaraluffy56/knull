@@ -260,6 +260,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/services/{id}/recovery-policy:
+    get:
+      operationId: getRecoveryPolicy
+      summary: Get the latest versioned recovery policy for a service
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      responses:
+        "200":
+          description: Current immutable policy snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryPolicySnapshot"
+        "401": { description: Authentication required. }
+        "404": { description: No policy configured for this service. }
+    put:
+      operationId: putRecoveryPolicy
+      summary: Create an immutable recovery policy version
+      description: Identical writes return the existing version. Workload readiness and at least one service indicator are required; missing observations can never count as recovery.
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoveryPolicy"
+      responses:
+        "200":
+          description: Current immutable policy snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryPolicySnapshot"
+        "400": { description: Invalid thresholds, signals, or observation window. }
+        "401": { description: Authentication required. }
+        "404": { description: Service not found. }
+  /api/services/{id}/recovery-policy/versions/{version}:
+    get:
+      operationId: getRecoveryPolicyVersion
+      summary: Get the exact policy used by a historic assessment
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+        - name: version
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "200":
+          description: Requested immutable policy snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryPolicySnapshot"
+        "400": { description: Invalid version. }
+        "401": { description: Authentication required. }
+        "404": { description: Policy version not found. }
   /api/alerts/webhook:
     post:
       operationId: alertWebhook
@@ -590,6 +647,39 @@ components:
         type: string
         format: uuid
   schemas:
+    RecoveryPolicy:
+      type: object
+      required: [windowSeconds, missingData, workload]
+      properties:
+        windowSeconds: { type: integer, minimum: 60, maximum: 3600 }
+        missingData: { type: string, enum: [UNCERTAIN, NOT_RECOVERED] }
+        workload:
+          type: object
+          required: [minReadyFraction]
+          properties:
+            minReadyFraction: { type: number, exclusiveMinimum: 0, maximum: 1 }
+        errorRate:
+          type: object
+          required: [maxRatio, minSamples]
+          properties:
+            maxRatio: { type: number, minimum: 0, exclusiveMaximum: 1 }
+            minSamples: { type: integer, minimum: 10 }
+        latencyP95:
+          type: object
+          required: [maxP95Milliseconds, minSamples]
+          properties:
+            maxP95Milliseconds: { type: number, exclusiveMinimum: 0 }
+            minSamples: { type: integer, minimum: 10 }
+    RecoveryPolicySnapshot:
+      type: object
+      required: [serviceId, version, digest, policy, configuredBy, configuredAt]
+      properties:
+        serviceId: { type: string, format: uuid }
+        version: { type: integer, format: int64 }
+        digest: { type: string }
+        policy: { $ref: "#/components/schemas/RecoveryPolicy" }
+        configuredBy: { type: string, format: uuid }
+        configuredAt: { type: string, format: date-time }
     ActionDecisionRequest:
       type: object
       required: [actionEventId, actionDigest]

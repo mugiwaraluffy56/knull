@@ -27,6 +27,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/investigate"
 	"github.com/mugiwaraluffy56/knull/backend/internal/mcp"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
+	"github.com/mugiwaraluffy56/knull/backend/internal/recoverypolicy"
 	"github.com/mugiwaraluffy56/knull/backend/internal/respond"
 	"github.com/mugiwaraluffy56/knull/backend/internal/sandbox"
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
@@ -131,8 +132,9 @@ func run(logger *slog.Logger) error {
 		runner := sandbox.NewRunner(client, sandbox.Config{ClusterUID: cfg.SandboxClusterUID, ProductionClusterUIDs: cfg.ProductionClusterUIDs, AllowedImageRegistry: cfg.SandboxImageRegistry, PullSecretName: cfg.SandboxPullSecretName})
 		sandboxService = sandbox.NewService(incidentStore, runner)
 		logger.Info("sandbox runner configured", "cluster_uid", cfg.SandboxClusterUID)
-		if cfg.TrueForgeURL != "" && cfg.TrueForgeValidationModel != "" && cfg.TrueForgeValidationMCP != "" && len(cfg.TrueForgeValidationTools) > 0 && cfg.SandboxPrometheusURL != "" && cfg.SandboxErrorRateQuery != "" && cfg.SandboxP95Query != "" {
-			script := validation.NewTrueForgeScriptEngine(validation.TrueForgeConfig{BaseURL: cfg.TrueForgeURL, Token: cfg.TrueForgeToken, Model: cfg.TrueForgeValidationModel, SandboxMCPName: cfg.TrueForgeValidationMCP, AllowedTools: cfg.TrueForgeValidationTools})
+		if cfg.TrueForgeURL != "" && cfg.TrueForgeValidationModel != "" && cfg.SandboxCodeImageDigest != "" && cfg.SandboxPrometheusURL != "" && cfg.SandboxErrorRateQuery != "" && cfg.SandboxP95Query != "" {
+			codeExecutor := validation.NewKubernetesCodeExecutor(validation.EKSExecutorConfig{Kubeconfig: cfg.SandboxKubeconfig, Context: cfg.SandboxContext, ClusterUID: cfg.SandboxClusterUID, ImageDigest: cfg.SandboxCodeImageDigest, AllowedImageRegistry: cfg.SandboxImageRegistry})
+			script := validation.NewTrueForgeScriptEngine(validation.TrueForgeConfig{BaseURL: cfg.TrueForgeURL, Token: cfg.TrueForgeToken, Model: cfg.TrueForgeValidationModel, Executor: codeExecutor})
 			metrics := validation.PrometheusObserver{BaseURL: cfg.SandboxPrometheusURL, Token: cfg.SandboxPrometheusToken, ErrorRateQuery: cfg.SandboxErrorRateQuery, P95MillisecondsQuery: cfg.SandboxP95Query}
 			memoryValidator = validation.NewService(incidentStore, runner, script, validation.KubernetesPodObserver{Reader: client}, metrics)
 			logger.Info("memory validation configured")
@@ -178,30 +180,31 @@ func run(logger *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Options{
-			Deps:            st,
-			AllowedOrigin:   cfg.AllowedOrigin,
-			HealthTimeout:   cfg.HealthTimeout,
-			Sessions:        sessions,
-			Authn:           authn,
-			Operators:       operatorStore,
-			Secrets:         secretStore,
-			Services:        serviceStore,
-			Incidents:       incidentStore,
-			FleetIncidents:  incidentStore,
-			Workflow:        workflowStarterOrNil(workflowManager),
-			Collector:       collectorOrNil(collector),
-			Classifier:      classifier,
-			ActionPlanner:   actions.NewService(incidentStore, serviceStore),
-			Approvals:       approvalService,
-			Executor:        productionExecutor,
-			Sandbox:         sandboxService,
-			MemoryValidator: memoryValidator,
-			AlertIntake:     alertIntake,
-			AlertFailures:   alertFailures,
-			AlertSecret:     cfg.AlertmanagerSecret,
-			AppBaseURL:      cfg.AppBaseURL,
-			UIBaseURL:       cfg.UIBaseURL,
-			Logger:          logger,
+			Deps:             st,
+			AllowedOrigin:    cfg.AllowedOrigin,
+			HealthTimeout:    cfg.HealthTimeout,
+			Sessions:         sessions,
+			Authn:            authn,
+			Operators:        operatorStore,
+			Secrets:          secretStore,
+			Services:         serviceStore,
+			RecoveryPolicies: recoverypolicy.NewStore(st.Pool),
+			Incidents:        incidentStore,
+			FleetIncidents:   incidentStore,
+			Workflow:         workflowStarterOrNil(workflowManager),
+			Collector:        collectorOrNil(collector),
+			Classifier:       classifier,
+			ActionPlanner:    actions.NewService(incidentStore, serviceStore),
+			Approvals:        approvalService,
+			Executor:         productionExecutor,
+			Sandbox:          sandboxService,
+			MemoryValidator:  memoryValidator,
+			AlertIntake:      alertIntake,
+			AlertFailures:    alertFailures,
+			AlertSecret:      cfg.AlertmanagerSecret,
+			AppBaseURL:       cfg.AppBaseURL,
+			UIBaseURL:        cfg.UIBaseURL,
+			Logger:           logger,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

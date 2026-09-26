@@ -180,6 +180,44 @@ export interface paths {
         patch: operations["setServiceEnabled"];
         trace?: never;
     };
+    "/api/services/{id}/recovery-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the latest versioned recovery policy for a service */
+        get: operations["getRecoveryPolicy"];
+        /**
+         * Create an immutable recovery policy version
+         * @description Identical writes return the existing version. Workload readiness and at least one service indicator are required; missing observations can never count as recovery.
+         */
+        put: operations["putRecoveryPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/services/{id}/recovery-policy/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the exact policy used by a historic assessment */
+        get: operations["getRecoveryPolicyVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts/webhook": {
         parameters: {
             query?: never;
@@ -395,6 +433,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        RecoveryPolicy: {
+            windowSeconds: number;
+            /** @enum {string} */
+            missingData: "UNCERTAIN" | "NOT_RECOVERED";
+            workload: {
+                minReadyFraction: number;
+            };
+            errorRate?: {
+                maxRatio: number;
+                minSamples: number;
+            };
+            latencyP95?: {
+                maxP95Milliseconds: number;
+                minSamples: number;
+            };
+        };
+        RecoveryPolicySnapshot: {
+            /** Format: uuid */
+            serviceId: string;
+            /** Format: int64 */
+            version: number;
+            digest: string;
+            policy: components["schemas"]["RecoveryPolicy"];
+            /** Format: uuid */
+            configuredBy: string;
+            /** Format: date-time */
+            configuredAt: string;
+        };
         ActionDecisionRequest: {
             /** Format: uuid */
             actionEventId: string;
@@ -1065,6 +1131,133 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    getRecoveryPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current immutable policy snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryPolicySnapshot"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No policy configured for this service. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    putRecoveryPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryPolicy"];
+            };
+        };
+        responses: {
+            /** @description Current immutable policy snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryPolicySnapshot"];
+                };
+            };
+            /** @description Invalid thresholds */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Service not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getRecoveryPolicyVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ServiceId"];
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requested immutable policy snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryPolicySnapshot"];
+                };
+            };
+            /** @description Invalid version. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Policy version not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

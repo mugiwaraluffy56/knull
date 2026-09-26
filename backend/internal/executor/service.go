@@ -26,6 +26,7 @@ type Client interface {
 
 type History interface {
 	Get(context.Context, uuid.UUID) (incidents.Incident, error)
+	Events(context.Context, uuid.UUID) ([]incidents.Event, error)
 	AppendEvent(context.Context, uuid.UUID, incidents.EventInput) error
 	Transition(context.Context, uuid.UUID, incidents.Transition) (incidents.Incident, error)
 }
@@ -41,6 +42,7 @@ const (
 
 type Receipt struct {
 	RequestID       string          `json:"requestId"`
+	PriorRequestID  string          `json:"priorRequestId,omitempty"`
 	ActionEventID   uuid.UUID       `json:"actionEventId"`
 	ActionDigest    string          `json:"actionDigest"`
 	Status          Status          `json:"status"`
@@ -80,7 +82,12 @@ func (s Service) Execute(ctx context.Context, incidentID, actionEventID uuid.UUI
 	if action.Digest != preview.Digest {
 		return Receipt{}, ErrTarget
 	}
-	receipt := Receipt{RequestID: uuid.NewString(), ActionEventID: actionEventID, ActionDigest: action.Digest, Status: Accepted, Target: action.Target, Field: action.Field, ObservedAt: time.Now().UTC()}
+	receipt := Receipt{RequestID: uuid.NewString(), ActionEventID: actionEventID, ActionDigest: action.Digest, Status: Unknown, Target: action.Target, Field: action.Field, ObservedAt: time.Now().UTC()}
+	// Persist the attempt before the external call. After a process crash the
+	// reconciler can inspect production state using the sealed contract.
+	if err := s.record(ctx, incidentID, receipt); err != nil {
+		return receipt, err
+	}
 	updated, patch, patchErr := s.Client.PatchMemory(ctx, action)
 	receipt.SubmittedPatch = patch
 	if patchErr != nil {
@@ -102,6 +109,10 @@ func (s Service) Execute(ctx context.Context, incidentID, actionEventID uuid.UUI
 	}
 	receipt.ResourceUID = string(updated.UID)
 	receipt.ResourceVersion = updated.ResourceVersion
+	receipt.Status = Accepted
+	if err := s.record(ctx, incidentID, receipt); err != nil {
+		return receipt, err
+	}
 	// A fresh read confirms the API server's persisted value, rather than
 	// trusting the patch response as evidence of a completed mutation.
 	live, err := s.Client.ReadPreconditions(ctx, action.Target, action.Field)

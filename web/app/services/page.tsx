@@ -11,6 +11,7 @@ import {
   type Service,
   type ServiceInput,
 } from "@/lib/api";
+import RecoveryPolicyPanel from "./RecoveryPolicyPanel";
 
 const EMPTY: FormState = {
   key: "",
@@ -83,6 +84,7 @@ export default function ServicesPage() {
   const [startFor, setStartFor] = useState<Service | null>(null);
   const [startSummary, setStartSummary] = useState("");
   const [startMsg, setStartMsg] = useState<string | null>(null);
+  const [policyFor, setPolicyFor] = useState<Service | null>(null);
 
   const load = useCallback(async () => {
     const res = await listServices();
@@ -202,7 +204,6 @@ export default function ServicesPage() {
       { k: "prometheusLabels", label: "Prometheus labels", ph: "app=checkout, environment=production" },
       { k: "githubRepo", label: "GitHub repo", ph: "acme/checkout" },
       { k: "githubRef", label: "GitHub ref", ph: "main" },
-      { k: "recoveryPolicyRef", label: "Recovery policy ref", ph: "optional" },
     ];
 
   return (
@@ -281,6 +282,8 @@ export default function ServicesPage() {
         )}
         {startMsg && <p className="subtitle">{startMsg}</p>}
 
+        {policyFor && <RecoveryPolicyPanel key={policyFor.id} service={policyFor} onClose={() => setPolicyFor(null)} />}
+
         <table className="cred-table">
           <thead>
             <tr>
@@ -326,6 +329,9 @@ export default function ServicesPage() {
                     </button>
                     <button className="btn btn-ghost" onClick={() => toggle(svc)}>
                       {svc.enabled ? "Disable" : "Enable"}
+                    </button>
+                    <button className="btn btn-ghost" onClick={() => setPolicyFor(svc)}>
+                      Recovery policy
                     </button>
                     {svc.enabled && (
                       <button

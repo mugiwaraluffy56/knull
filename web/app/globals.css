@@ -523,3 +523,21 @@ code {
   .approval-change { gap: 9px; padding: 15px; }
   .approval-buttons button { flex: 1; }
 }
+
+/* Service recovery policy editor */
+.recovery-panel { margin: 24px 0; padding: 24px; background: #09090b; color: #fff; border: 1px solid rgba(255,255,255,.14); border-radius: 18px; }
+.recovery-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.recovery-head h2 { margin: 4px 0 18px; font-size: 24px; letter-spacing: -.03em; }
+.recovery-eyebrow { color: #aaa; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
+.recovery-current { display: grid; gap: 5px; margin-bottom: 16px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: #171719; font-size: 13px; }
+.recovery-current span { color: #aaa; }
+.recovery-explainer { color: #aaa; font-size: 13px; line-height: 1.5; }
+.recovery-form-grid, .recovery-signals { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 18px 0; }
+.recovery-form :is(label:not(.recovery-check)) { display: grid; gap: 7px; color: #ccc; font-size: 13px; }
+.recovery-form :is(input:not([type="checkbox"]),select) { min-width: 0; width: 100%; padding: 10px 12px; background: #171719; color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font: inherit; }
+.recovery-signal { padding: 16px; background: #171719; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; }
+.recovery-check { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.recovery-signal-fields { display: grid; gap: 12px; margin-top: 14px; }
+.recovery-form-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.recovery-panel :is(button,input,select):focus-visible { outline: 2px solid #64b4ff; outline-offset: 3px; }
+@media (max-width: 680px) { .recovery-panel { padding: 18px; } .recovery-form-grid, .recovery-signals { grid-template-columns: 1fr; } }

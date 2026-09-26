@@ -13,9 +13,18 @@ import (
 
 type productionExecutor interface {
 	Execute(context.Context, uuid.UUID, uuid.UUID, string) (executor.Receipt, error)
+	Reconcile(context.Context, uuid.UUID, uuid.UUID, string) (executor.Receipt, error)
 }
 
 func (s *Server) handleExecuteMemory(w http.ResponseWriter, r *http.Request) {
+	s.handleMemoryExecution(w, r, false)
+}
+
+func (s *Server) handleReconcileMemory(w http.ResponseWriter, r *http.Request) {
+	s.handleMemoryExecution(w, r, true)
+}
+
+func (s *Server) handleMemoryExecution(w http.ResponseWriter, r *http.Request, reconcile bool) {
 	if s.executor == nil {
 		writeError(w, http.StatusServiceUnavailable, "production execution is disabled")
 		return
@@ -36,7 +45,12 @@ func (s *Server) handleExecuteMemory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid execution request")
 		return
 	}
-	receipt, err := s.executor.Execute(r.Context(), incidentID, request.ActionEventID, request.ActionDigest)
+	var receipt executor.Receipt
+	if reconcile {
+		receipt, err = s.executor.Reconcile(r.Context(), incidentID, request.ActionEventID, request.ActionDigest)
+	} else {
+		receipt, err = s.executor.Execute(r.Context(), incidentID, request.ActionEventID, request.ActionDigest)
+	}
 	if err == nil {
 		writeJSON(w, http.StatusOK, receipt)
 		return
@@ -50,7 +64,7 @@ func (s *Server) handleExecuteMemory(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, incidents.ErrNotFound):
 		writeError(w, http.StatusNotFound, "incident not found")
-	case errors.Is(err, approval.ErrIneligible), errors.Is(err, approval.ErrExpired), errors.Is(err, approval.ErrStale), errors.Is(err, executor.ErrTarget):
+	case errors.Is(err, approval.ErrIneligible), errors.Is(err, approval.ErrExpired), errors.Is(err, approval.ErrStale), errors.Is(err, executor.ErrTarget), errors.Is(err, executor.ErrReconcile):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
 		s.internalError(w, "execute approved memory patch", err)

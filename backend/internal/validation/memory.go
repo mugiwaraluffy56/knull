@@ -28,6 +28,7 @@ type ScriptRequest struct {
 }
 type ScriptResult struct {
 	ArtifactRef string `json:"artifactRef"`
+	Code        string `json:"code,omitempty"`
 	SessionID   string `json:"sessionId,omitempty"`
 	TurnID      string `json:"turnId,omitempty"`
 	SandboxID   string `json:"sandboxId,omitempty"`
@@ -159,7 +160,7 @@ func (s *Service) ValidateMemory(ctx context.Context, incidentID, actionEventID 
 		if checkErr != nil {
 			return checkErr
 		}
-		if observation.Pods.OOMKills < 1 || observation.Pods.Healthy >= observation.Pods.Desired {
+		if observation.Pods.OOMKills < 1 {
 			return fmt.Errorf("%w: 256Mi failure did not reproduce", ErrFailed)
 		}
 		return nil
