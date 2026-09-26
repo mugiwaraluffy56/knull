@@ -30,6 +30,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
 	"github.com/mugiwaraluffy56/knull/backend/internal/store"
+	"github.com/mugiwaraluffy56/knull/backend/internal/validation"
 	"github.com/mugiwaraluffy56/knull/backend/internal/workflow"
 )
 
@@ -122,11 +123,18 @@ func run(logger *slog.Logger) error {
 		logger.Info("Jev classification enabled", "url", cfg.JevMCPURL)
 	}
 	var sandboxService *sandbox.Service
+	var memoryValidator *validation.Service
 	if cfg.SandboxKubeconfig != "" {
 		client := sandbox.Kubectl{Kubeconfig: cfg.SandboxKubeconfig, Context: cfg.SandboxContext}
 		runner := sandbox.NewRunner(client, sandbox.Config{ClusterUID: cfg.SandboxClusterUID, ProductionClusterUIDs: cfg.ProductionClusterUIDs, AllowedImageRegistry: cfg.SandboxImageRegistry, PullSecretName: cfg.SandboxPullSecretName})
 		sandboxService = sandbox.NewService(incidentStore, runner)
 		logger.Info("sandbox runner configured", "cluster_uid", cfg.SandboxClusterUID)
+		if cfg.TrueForgeURL != "" && cfg.TrueForgeValidationModel != "" && cfg.TrueForgeValidationMCP != "" && len(cfg.TrueForgeValidationTools) > 0 && cfg.SandboxPrometheusURL != "" && cfg.SandboxErrorRateQuery != "" && cfg.SandboxP95Query != "" {
+			script := validation.NewTrueForgeScriptEngine(validation.TrueForgeConfig{BaseURL: cfg.TrueForgeURL, Token: cfg.TrueForgeToken, Model: cfg.TrueForgeValidationModel, SandboxMCPName: cfg.TrueForgeValidationMCP, AllowedTools: cfg.TrueForgeValidationTools})
+			metrics := validation.PrometheusObserver{BaseURL: cfg.SandboxPrometheusURL, Token: cfg.SandboxPrometheusToken, ErrorRateQuery: cfg.SandboxErrorRateQuery, P95MillisecondsQuery: cfg.SandboxP95Query}
+			memoryValidator = validation.NewService(incidentStore, runner, script, validation.KubernetesPodObserver{Reader: client}, metrics)
+			logger.Info("memory validation configured")
+		}
 	}
 
 	var cipher *secrets.Cipher
@@ -158,27 +166,28 @@ func run(logger *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Options{
-			Deps:           st,
-			AllowedOrigin:  cfg.AllowedOrigin,
-			HealthTimeout:  cfg.HealthTimeout,
-			Sessions:       sessions,
-			Authn:          authn,
-			Operators:      operatorStore,
-			Secrets:        secretStore,
-			Services:       serviceStore,
-			Incidents:      incidentStore,
-			FleetIncidents: incidentStore,
-			Workflow:       workflowStarterOrNil(workflowManager),
-			Collector:      collectorOrNil(collector),
-			Classifier:     classifier,
-			ActionPlanner:  actions.NewService(incidentStore, serviceStore),
-			Sandbox:        sandboxService,
-			AlertIntake:    alertIntake,
-			AlertFailures:  alertFailures,
-			AlertSecret:    cfg.AlertmanagerSecret,
-			AppBaseURL:     cfg.AppBaseURL,
-			UIBaseURL:      cfg.UIBaseURL,
-			Logger:         logger,
+			Deps:            st,
+			AllowedOrigin:   cfg.AllowedOrigin,
+			HealthTimeout:   cfg.HealthTimeout,
+			Sessions:        sessions,
+			Authn:           authn,
+			Operators:       operatorStore,
+			Secrets:         secretStore,
+			Services:        serviceStore,
+			Incidents:       incidentStore,
+			FleetIncidents:  incidentStore,
+			Workflow:        workflowStarterOrNil(workflowManager),
+			Collector:       collectorOrNil(collector),
+			Classifier:      classifier,
+			ActionPlanner:   actions.NewService(incidentStore, serviceStore),
+			Sandbox:         sandboxService,
+			MemoryValidator: memoryValidator,
+			AlertIntake:     alertIntake,
+			AlertFailures:   alertFailures,
+			AlertSecret:     cfg.AlertmanagerSecret,
+			AppBaseURL:      cfg.AppBaseURL,
+			UIBaseURL:       cfg.UIBaseURL,
+			Logger:          logger,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

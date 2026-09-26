@@ -331,6 +331,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidents/{id}/validations/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reproduce a 256Mi OOM and validate a 1Gi candidate
+         * @description Runs two isolated sandbox namespaces, requires a TrueForge executed script and independent Kubernetes and Prometheus observations, verifies cleanup, then records the result. Failed or missing evidence cannot advance to approval.
+         */
+        post: operations["validateMemory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -342,28 +362,67 @@ export interface components {
             cpu: string;
             memory: string;
         };
+        SandboxRun: {
+            /** Format: uuid */
+            id: string;
+            namespace: string;
+            clusterUid: string;
+            actionDigest: string;
+            actionVersion: string;
+            workload: components["schemas"]["SandboxWorkload"];
+            limitations: string[];
+            environmentDifferences: string[];
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string;
+            cleanupVerified: boolean;
+            /** @enum {string} */
+            status: "prepared" | "checked" | "failed";
+            error?: string;
+        };
         SandboxRecordedRun: {
             /** Format: uuid */
             eventId: string;
-            run: {
-                /** Format: uuid */
-                id: string;
-                namespace: string;
-                clusterUid: string;
-                actionDigest: string;
-                actionVersion: string;
-                workload: components["schemas"]["SandboxWorkload"];
-                limitations: string[];
-                environmentDifferences: string[];
-                /** Format: date-time */
-                startedAt: string;
-                /** Format: date-time */
-                finishedAt: string;
-                cleanupVerified: boolean;
-                /** @enum {string} */
-                status: "prepared" | "checked" | "failed";
-                error?: string;
+            run: components["schemas"]["SandboxRun"];
+        };
+        MemoryValidationEvidence: {
+            script: {
+                artifactRef: string;
+                sessionId?: string;
+                turnId?: string;
+                sandboxId?: string;
+                executionId?: string;
+                exitCode: number;
+                output: string;
             };
+            pods: {
+                desired: number;
+                healthy: number;
+                oomKills: number;
+                /** Format: date-time */
+                observedAt: string;
+            };
+            metrics: {
+                errorRate: number;
+                p95Milliseconds: number;
+                samples: number;
+                /** Format: date-time */
+                windowStart: string;
+                /** Format: date-time */
+                windowEnd: string;
+            };
+        };
+        MemoryValidationResult: {
+            /** Format: uuid */
+            actionEventId: string;
+            actionDigest: string;
+            baseline: components["schemas"]["SandboxRun"];
+            candidate: components["schemas"]["SandboxRun"];
+            baselineEvidence: components["schemas"]["MemoryValidationEvidence"];
+            candidateEvidence: components["schemas"]["MemoryValidationEvidence"];
+            passed: boolean;
+            failure?: string;
         };
         ActionTarget: {
             cluster: string;
@@ -1307,6 +1366,76 @@ export interface operations {
                 content?: never;
             };
             /** @description Dedicated sandbox cluster not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    validateMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    actionEventId: string;
+                    workload: components["schemas"]["SandboxWorkload"];
+                };
+            };
+        };
+        responses: {
+            /** @description Baseline failure reproduced and candidate passed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryValidationResult"];
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed; response includes result and error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        result: components["schemas"]["MemoryValidationResult"];
+                    };
+                };
+            };
+            /** @description Validation dependencies not configured. */
             503: {
                 headers: {
                     [name: string]: unknown;

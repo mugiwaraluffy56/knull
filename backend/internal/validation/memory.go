@@ -28,6 +28,10 @@ type ScriptRequest struct {
 }
 type ScriptResult struct {
 	ArtifactRef string `json:"artifactRef"`
+	SessionID   string `json:"sessionId,omitempty"`
+	TurnID      string `json:"turnId,omitempty"`
+	SandboxID   string `json:"sandboxId,omitempty"`
+	ExecutionID string `json:"executionId,omitempty"`
 	ExitCode    int    `json:"exitCode"`
 	Output      string `json:"output"`
 }

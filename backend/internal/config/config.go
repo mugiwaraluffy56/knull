@@ -57,6 +57,10 @@ type Config struct {
 	TrueForgeURL string
 	// TrueForgeToken authenticates requests to TrueForge.
 	TrueForgeToken string
+	// These select a dedicated sandbox-only validation agent and connector.
+	TrueForgeValidationModel string
+	TrueForgeValidationMCP   string
+	TrueForgeValidationTools []string
 
 	// K8sMCPURL / K8sMCPToken address the read-only Kubernetes MCP server.
 	K8sMCPURL   string
@@ -68,14 +72,18 @@ type Config struct {
 	GitHubMCPURL   string
 	GitHubMCPToken string
 	// JevMCPURL connects the decision-only server. Empty disables classification.
-	JevMCPURL             string
-	JevMinConfidence      float64
-	SandboxKubeconfig     string
-	SandboxContext        string
-	SandboxClusterUID     string
-	ProductionClusterUIDs []string
-	SandboxImageRegistry  string
-	SandboxPullSecretName string
+	JevMCPURL              string
+	JevMinConfidence       float64
+	SandboxKubeconfig      string
+	SandboxContext         string
+	SandboxClusterUID      string
+	ProductionClusterUIDs  []string
+	SandboxImageRegistry   string
+	SandboxPullSecretName  string
+	SandboxPrometheusURL   string
+	SandboxPrometheusToken string
+	SandboxErrorRateQuery  string
+	SandboxP95Query        string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -109,30 +117,41 @@ func Load() (Config, error) {
 			ClientID:     getenv("KNULL_OIDC_CLIENT_ID", "knull-backend"),
 			ClientSecret: getenv("KNULL_OIDC_CLIENT_SECRET", "knull-local-secret"),
 		},
-		SessionTTL:            8 * time.Hour,
-		CookieSecure:          getenvBool("KNULL_COOKIE_SECURE", false),
-		AppBaseURL:            getenv("KNULL_APP_BASE_URL", "http://localhost:8080"),
-		UIBaseURL:             getenv("KNULL_UI_BASE_URL", "http://localhost:3000"),
-		SecretKey:             os.Getenv("KNULL_SECRET_KEY"),
-		AlertmanagerSecret:    os.Getenv("KNULL_ALERTMANAGER_SECRET"),
-		AlertServiceLabel:     getenv("KNULL_ALERT_SERVICE_LABEL", "service"),
-		AlertEnvironmentLabel: getenv("KNULL_ALERT_ENVIRONMENT_LABEL", "environment"),
-		TrueForgeURL:          os.Getenv("KNULL_TRUEFORGE_URL"),
-		TrueForgeToken:        os.Getenv("KNULL_TRUEFORGE_TOKEN"),
-		K8sMCPURL:             os.Getenv("KNULL_K8S_MCP_URL"),
-		K8sMCPToken:           os.Getenv("KNULL_K8S_MCP_TOKEN"),
-		PrometheusMCPURL:      os.Getenv("KNULL_PROMETHEUS_MCP_URL"),
-		PrometheusMCPToken:    os.Getenv("KNULL_PROMETHEUS_MCP_TOKEN"),
-		GitHubMCPURL:          os.Getenv("KNULL_GITHUB_MCP_URL"),
-		GitHubMCPToken:        os.Getenv("KNULL_GITHUB_MCP_TOKEN"),
-		JevMCPURL:             os.Getenv("KNULL_JEV_MCP_URL"),
-		JevMinConfidence:      0.65,
-		SandboxKubeconfig:     os.Getenv("KNULL_SANDBOX_KUBECONFIG"),
-		SandboxContext:        os.Getenv("KNULL_SANDBOX_CONTEXT"),
-		SandboxClusterUID:     os.Getenv("KNULL_SANDBOX_CLUSTER_UID"),
-		ProductionClusterUIDs: strings.Split(os.Getenv("KNULL_PRODUCTION_CLUSTER_UIDS"), ","),
-		SandboxImageRegistry:  os.Getenv("KNULL_SANDBOX_IMAGE_REGISTRY"),
-		SandboxPullSecretName: os.Getenv("KNULL_SANDBOX_PULL_SECRET_NAME"),
+		SessionTTL:               8 * time.Hour,
+		CookieSecure:             getenvBool("KNULL_COOKIE_SECURE", false),
+		AppBaseURL:               getenv("KNULL_APP_BASE_URL", "http://localhost:8080"),
+		UIBaseURL:                getenv("KNULL_UI_BASE_URL", "http://localhost:3000"),
+		SecretKey:                os.Getenv("KNULL_SECRET_KEY"),
+		AlertmanagerSecret:       os.Getenv("KNULL_ALERTMANAGER_SECRET"),
+		AlertServiceLabel:        getenv("KNULL_ALERT_SERVICE_LABEL", "service"),
+		AlertEnvironmentLabel:    getenv("KNULL_ALERT_ENVIRONMENT_LABEL", "environment"),
+		TrueForgeURL:             os.Getenv("KNULL_TRUEFORGE_URL"),
+		TrueForgeToken:           os.Getenv("KNULL_TRUEFORGE_TOKEN"),
+		TrueForgeValidationModel: os.Getenv("KNULL_TRUEFORGE_VALIDATION_MODEL"),
+		TrueForgeValidationMCP:   os.Getenv("KNULL_TRUEFORGE_VALIDATION_MCP"),
+		K8sMCPURL:                os.Getenv("KNULL_K8S_MCP_URL"),
+		K8sMCPToken:              os.Getenv("KNULL_K8S_MCP_TOKEN"),
+		PrometheusMCPURL:         os.Getenv("KNULL_PROMETHEUS_MCP_URL"),
+		PrometheusMCPToken:       os.Getenv("KNULL_PROMETHEUS_MCP_TOKEN"),
+		GitHubMCPURL:             os.Getenv("KNULL_GITHUB_MCP_URL"),
+		GitHubMCPToken:           os.Getenv("KNULL_GITHUB_MCP_TOKEN"),
+		JevMCPURL:                os.Getenv("KNULL_JEV_MCP_URL"),
+		JevMinConfidence:         0.65,
+		SandboxKubeconfig:        os.Getenv("KNULL_SANDBOX_KUBECONFIG"),
+		SandboxContext:           os.Getenv("KNULL_SANDBOX_CONTEXT"),
+		SandboxClusterUID:        os.Getenv("KNULL_SANDBOX_CLUSTER_UID"),
+		ProductionClusterUIDs:    strings.Split(os.Getenv("KNULL_PRODUCTION_CLUSTER_UIDS"), ","),
+		SandboxImageRegistry:     os.Getenv("KNULL_SANDBOX_IMAGE_REGISTRY"),
+		SandboxPullSecretName:    os.Getenv("KNULL_SANDBOX_PULL_SECRET_NAME"),
+		SandboxPrometheusURL:     os.Getenv("KNULL_SANDBOX_PROMETHEUS_URL"),
+		SandboxPrometheusToken:   os.Getenv("KNULL_SANDBOX_PROMETHEUS_TOKEN"),
+		SandboxErrorRateQuery:    os.Getenv("KNULL_SANDBOX_ERROR_RATE_QUERY"),
+		SandboxP95Query:          os.Getenv("KNULL_SANDBOX_P95_QUERY"),
+	}
+	if raw := os.Getenv("KNULL_TRUEFORGE_VALIDATION_TOOLS"); raw != "" {
+		for _, tool := range strings.Split(raw, ",") {
+			c.TrueForgeValidationTools = append(c.TrueForgeValidationTools, strings.TrimSpace(tool))
+		}
 	}
 	if raw := os.Getenv("KNULL_JEV_MIN_CONFIDENCE"); raw != "" {
 		value, err := strconv.ParseFloat(raw, 64)
