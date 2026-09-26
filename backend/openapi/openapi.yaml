@@ -131,7 +131,144 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/services:
+    get:
+      operationId: listServices
+      summary: List configured services
+      responses:
+        "200":
+          description: All configured services.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [services]
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Service"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createService
+      summary: Create a service mapping
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInput"
+      responses:
+        "201":
+          description: Created service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "400":
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "409":
+          description: Duplicate key in this environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/services/{id}:
+    get:
+      operationId: getService
+      summary: Get a service
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      responses:
+        "200":
+          description: The service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: updateService
+      summary: Update a service mapping
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInput"
+      responses:
+        "200":
+          description: Updated service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "400":
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "409":
+          description: Duplicate key in this environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/services/{id}/enabled:
+    patch:
+      operationId: setServiceEnabled
+      summary: Enable or disable a service
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
+  parameters:
+    ServiceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     HealthStatus:
       type: object
@@ -215,3 +352,60 @@ components:
       properties:
         error:
           type: string
+    ValidationError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+          description: Field name to actionable message.
+    ServiceInput:
+      type: object
+      required: [key, displayName, environment, k8sCluster, k8sNamespace, k8sWorkload]
+      properties:
+        key:
+          type: string
+          description: Stable slug identifier (e.g. checkout-api).
+        displayName:
+          type: string
+        environment:
+          type: string
+          description: Explicit environment slug (e.g. production).
+        k8sCluster:
+          type: string
+        k8sNamespace:
+          type: string
+        k8sWorkload:
+          type: string
+        prometheusLabels:
+          type: object
+          additionalProperties:
+            type: string
+        githubRepo:
+          type: string
+          description: owner/repo (optional).
+        githubRef:
+          type: string
+        recoveryPolicyRef:
+          type: string
+    Service:
+      allOf:
+        - $ref: "#/components/schemas/ServiceInput"
+        - type: object
+          required: [id, enabled, createdAt, updatedAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            enabled:
+              type: boolean
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time

@@ -37,6 +37,7 @@ type Options struct {
 	Authn         *auth.Authenticator // nil when OIDC is not configured/reachable
 	Operators     operatorStore
 	Secrets       secretStore
+	Services      serviceStore
 	AppBaseURL    string
 	UIBaseURL     string
 	Logger        *slog.Logger
@@ -51,6 +52,7 @@ type Server struct {
 	authn         *auth.Authenticator
 	operators     operatorStore
 	secrets       secretStore
+	services      serviceStore
 	appBaseURL    string
 	uiBaseURL     string
 	logger        *slog.Logger
@@ -72,6 +74,7 @@ func New(opts Options) *Server {
 		authn:         opts.Authn,
 		operators:     opts.Operators,
 		secrets:       opts.Secrets,
+		services:      opts.Services,
 		appBaseURL:    opts.AppBaseURL,
 		uiBaseURL:     opts.UIBaseURL,
 		logger:        opts.Logger,
@@ -93,6 +96,12 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/me", s.requireOperator(http.HandlerFunc(s.handleMe)))
 	mux.Handle("GET /api/integrations/credentials", s.requireOperator(http.HandlerFunc(s.handleListCredentials)))
 	mux.Handle("PUT /api/integrations/credentials", s.requireOperator(http.HandlerFunc(s.handlePutCredential)))
+
+	mux.Handle("GET /api/services", s.requireOperator(http.HandlerFunc(s.handleListServices)))
+	mux.Handle("POST /api/services", s.requireOperator(http.HandlerFunc(s.handleCreateService)))
+	mux.Handle("GET /api/services/{id}", s.requireOperator(http.HandlerFunc(s.handleGetService)))
+	mux.Handle("PUT /api/services/{id}", s.requireOperator(http.HandlerFunc(s.handleUpdateService)))
+	mux.Handle("PATCH /api/services/{id}/enabled", s.requireOperator(http.HandlerFunc(s.handleSetServiceEnabled)))
 
 	return s.withCORS(mux)
 }

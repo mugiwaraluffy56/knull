@@ -73,7 +73,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Invalid or ambiguous environment mappings are rejected with actionable errors.
 - Every stored integration mapping is scoped to an explicit service and environment.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; verification passes. PR/commit: 3dc0bb7
 
 ### 4. Persist incident state and audit events
 

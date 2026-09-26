@@ -19,6 +19,9 @@ export default function RootLayout({
             <Link href="/" className="brand">
               Knull
             </Link>
+            <Link href="/services" className="navlink">
+              Services
+            </Link>
             <Link href="/integrations" className="navlink">
               Integrations
             </Link>

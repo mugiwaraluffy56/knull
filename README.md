@@ -194,6 +194,12 @@ encrypted at rest with AES-256-GCM; values are write-only and never returned by
 the API — only a non-reversible fingerprint is shown. Set `KNULL_SECRET_KEY`
 (any 32-byte key) to enable credential storage.
 
+**Services:** the **Services** page configures each service and its
+environment-scoped mapping to a Kubernetes workload, a Prometheus label
+selector, and a GitHub repository. The `(key, environment)` pair is unique, so
+the same service can exist in several environments without a mapping ever
+spanning two of them.
+
 Run all checks the way CI does:
 
 ```bash

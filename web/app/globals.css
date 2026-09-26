@@ -254,3 +254,42 @@ code {
   background: rgba(231, 76, 60, 0.15);
   color: var(--bad);
 }
+
+/* Service form */
+.svc-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.svc-form .field {
+  min-width: 0;
+}
+.svc-form input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+  width: 100%;
+}
+.svc-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+}
+.field-error {
+  color: var(--bad);
+  font-size: 12px;
+}
+.row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .svc-form {
+    grid-template-columns: 1fr;
+  }
+}

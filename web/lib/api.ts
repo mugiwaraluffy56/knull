@@ -115,3 +115,80 @@ export async function putCredential(input: {
 export function loginURL(): string {
   return `${API_BASE_URL}/api/auth/login`;
 }
+
+export type Service = components["schemas"]["Service"];
+export type ServiceInput = components["schemas"]["ServiceInput"];
+
+export interface ServicesResult {
+  authenticated: boolean;
+  services: Service[];
+}
+
+// listServices returns configured services, or authenticated=false when the
+// caller has no session.
+export async function listServices(): Promise<ServicesResult> {
+  const res = await fetch(`${API_BASE_URL}/api/services`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (res.status === 401) return { authenticated: false, services: [] };
+  const body = (await res.json()) as { services: Service[] };
+  return { authenticated: true, services: body.services ?? [] };
+}
+
+// MutationResult carries either a stored service or field-level validation
+// errors so the form can point at the exact problem.
+export interface MutationResult {
+  ok: boolean;
+  service?: Service;
+  error?: string;
+  fields?: Record<string, string>;
+}
+
+async function serviceMutation(
+  url: string,
+  method: "POST" | "PUT",
+  input: ServiceInput,
+): Promise<MutationResult> {
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.ok) {
+    return { ok: true, service: (await res.json()) as Service };
+  }
+  try {
+    const body = (await res.json()) as {
+      error?: string;
+      fields?: Record<string, string>;
+    };
+    return { ok: false, error: body.error, fields: body.fields };
+  } catch {
+    return { ok: false, error: `request failed (${res.status})` };
+  }
+}
+
+export function createService(input: ServiceInput): Promise<MutationResult> {
+  return serviceMutation(`${API_BASE_URL}/api/services`, "POST", input);
+}
+
+export function updateService(
+  id: string,
+  input: ServiceInput,
+): Promise<MutationResult> {
+  return serviceMutation(`${API_BASE_URL}/api/services/${id}`, "PUT", input);
+}
+
+export async function setServiceEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/services/${id}/enabled`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
