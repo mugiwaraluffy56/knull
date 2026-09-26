@@ -389,7 +389,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - The incident timeline shows TrueForge execute the generated validation code in the sandbox and records its result alongside independent workload and metric observations.
 - Failed, incomplete, or unavailable validation cannot become eligible for production approval.
 
-**Completion:** [ ] Fail-closed gate scaffold committed; TrueForge execution, sandbox telemetry, representative workload, and live two-run verification pending. PR/commit: pending
+**Completion:** [ ] Gate, pod/Prometheus readers, and representative workload pushed; TrueForge execution and live two-run sandbox verification pending. PR/commits: 88578a2, 86dead3, fc45e7a, f03f36e
 
 ### 19. Enforce action-specific approval
 

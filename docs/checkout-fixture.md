@@ -7,6 +7,13 @@ At a 256 MiB container limit this should trigger an OOM kill; at 1 GiB the
 same request should complete and later requests should be fast. The actual
 outcome must be observed in the dedicated sandbox cluster before approval.
 
+Local Docker verification on 2026-09-26 used `--memory=256m
+--memory-swap=256m` and produced `OOMKilled=true`, exit code 137. The same
+image under `--memory=1g --memory-swap=1g` returned `{"checkout":"ok"}`
+and remained running. Docker Desktop allowed the 256 MiB process to respond
+when swap was not capped, so cap swap when reproducing the memory failure
+locally. These results do not substitute for dedicated EKS verification.
+
 From `backend/`, build with
 `docker build -f cmd/checkout-fixture/Dockerfile -t <sandbox-registry>/checkout-fixture:<version> .`.
 Push to a pull-only sandbox registry and use the resulting immutable
