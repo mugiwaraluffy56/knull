@@ -50,8 +50,12 @@ The first complete user journey is a Kubernetes service whose memory limit chang
 - A deployment has a stable service identity that can be mapped to Kubernetes resources, telemetry queries, and source-control configuration.
 - The operator has connected read-capable integrations for Kubernetes, Prometheus, and GitHub before an incident is investigated.
 - Production mutation credentials are available only to the trusted execution boundary, never to the model or browser client directly.
-- Alert delivery can be provided by a configured alert source. The exact provider and webhook contract are deployment decisions.
+- The first alert source is Prometheus Alertmanager's generic webhook receiver. Manual incident creation is also available in the UI.
 - Each incident has one designated environment and affected service at a time in the MVP.
+- The customer supplies a production EKS cluster and a separate, dedicated sandbox EKS cluster in the same AWS account for the initial deployment. A production namespace is not an acceptable sandbox boundary.
+- Per-run namespaces in the sandbox cluster control resources and lifecycle but are not treated as strong isolation boundaries; the dedicated cluster separates validation from production.
+- Customer operators authenticate through their OIDC identity provider. Local development and CI use a disposable Keycloak OIDC realm.
+- GitHub access uses a customer-installed GitHub App with read-only repository/content/pull-request access for mapped repositories.
 
 ## 4. Product experience
 
@@ -122,7 +126,7 @@ The timeline records alert receipt, investigation steps, MCP calls, findings, Je
 
 ### 6.3 Jev decision service (`jev-mcp`)
 
-Jev is the typed decision layer. It consumes evidence and returns structured decisions; it does not independently collect infrastructure evidence or execute infrastructure changes.
+Jev is a Go MCP service and the OpenAI model adapter. It consumes incident evidence and returns schema-constrained structured decisions through the OpenAI Responses API. The Go service validates the returned schema and checks all evidence/action references against the incident record. It does not independently collect infrastructure evidence, receive infrastructure credentials, invoke tools, approve actions, or execute infrastructure changes. Confidence is not presented as calibrated until a documented evaluation and calibration process supports that claim.
 
 - **`classify_incident`** returns one or more ranked classes: `RESOURCE_EXHAUSTION`, `BAD_DEPLOYMENT`, `DEPENDENCY_FAILURE`, `TRAFFIC_SPIKE`, `CONFIGURATION_ERROR`, or `UNKNOWN`, with probability/confidence and evidence references.
 - **`select_next_action`** returns `INVESTIGATE_MORE`, `TEST_REMEDIATION`, `REMEDIATE`, or `ESCALATE`, with rationale summary, confidence, and required evidence.
@@ -220,27 +224,27 @@ Events are append-only. Mutable projections may be used for current UI state, bu
 
 ### Kubernetes MCP
 
-Read capabilities: list/describe pods, get deployment, get events, get logs, and get resource usage. Mutation capabilities: restart workload, patch deployment, and scale deployment. The integration must expose environment and resource identity on every call and return structured status/errors.
+Use `containers/kubernetes-mcp-server` with read-only mode and a dedicated Kubernetes read-only service account for list/describe pods, deployments, events, logs, and resource usage. The MCP server is never given production mutation privileges. The Go production executor uses a separately configured Kubernetes client and narrow RBAC to restart, patch, or scale only allowlisted mapped resources after policy and approval checks. Every operation includes environment and resource identity and returns structured status/errors.
 
 ### Prometheus MCP
 
-Capabilities: instant metric query, range query, and alert lookup. Each query/result includes query text or identifier, evaluation interval, units when known, and timestamp. Queries must be scoped to the service/environment mapping.
+Use `prometheus/prometheus-mcp` with only read-only query, range query, metric metadata, labels, and alert/rule lookup tools enabled. Disable administrative tools such as reload and shutdown. Each query/result includes query text or identifier, evaluation interval, units when known, and timestamp. Queries must be scoped to the service/environment mapping.
 
 ### GitHub MCP
 
-Read recent commits, pull requests, deployment configuration, manifests, and other mapped changes. Results include repository/ref, commit or PR identity, timestamp, and relevant diff/configuration reference.
+Use GitHub's official MCP server with only read-only tools enabled, authenticated by a customer-installed GitHub App restricted to mapped repositories and read-only contents/metadata/pull-request permissions. Read recent commits, pull requests, deployment configuration, manifests, and other mapped changes. Results include repository/ref, commit or PR identity, timestamp, and relevant diff/configuration reference.
 
 ### Jev MCP
 
-Implements the four typed decision operations in Section 6.3. Decision calls are side-effect-free with respect to infrastructure.
+Implements the four typed decision operations in Section 6.3 in Go. Jev calls the OpenAI Responses API for model-backed analysis and requires schema-constrained structured output. The Go service validates every response against the operation schema and verifies all evidence/action references against the incident record before returning it. Jev has no infrastructure credentials and cannot invoke MCP tools, approve actions, change incident state, or execute mutations. Model name and API request limits are configuration; model/version and request metadata are recorded with each decision.
 
 ### Alert source
 
-An adapter normalizes alert notifications to the incident intake contract. The alert vendor and exact payload are open deployment choices.
+Prometheus Alertmanager sends notifications to an authenticated generic webhook endpoint. The Go incident API verifies the configured shared secret, normalizes the Alertmanager payload, handles resolved notifications, and deduplicates repeat notifications. The UI also supports operator-triggered incidents. Additional alert providers are out of initial scope.
 
 ### Sandbox
 
-An adapter provisions or selects an isolated test environment, applies only the proposed sandbox action, runs the workload/load scenario, observes test signals, and destroys or resets ephemeral resources according to retention policy.
+Use a customer-provisioned, dedicated sandbox EKS cluster that is separate from every production cluster; the cluster is the isolation boundary. For each validation, provision a fresh namespace for resource controls and cleanup, with a unique run identity, strict resource quotas, restricted Pod Security settings, disabled service-account token automount, and default-deny network policy with only required egress. The sandbox executor has no production credentials or kubeconfig and can address only the sandbox cluster. Use sanitized workload configuration and pull-only image access; never copy production Secret values or production data. Apply the proposed action, run the bounded workload/load scenario, collect Kubernetes and sandbox-local Prometheus signals, then delete the namespace and its resources. A missing, unhealthy, or insufficiently isolated sandbox must fail closed: validation is not passed and production approval is unavailable.
 
 ## 11. Architecture and component responsibilities
 
@@ -249,12 +253,16 @@ An adapter provisions or selects an isolated test environment, applies only the 
 - **Frontend:** TypeScript, React, and Next.js App Router. Use the Node.js 24 LTS runtime for the web application.
 - **Backend:** Go service using the standard `net/http` package for the incident API, service configuration, approval policy, execution, and recovery APIs.
 - **Workflow runtime:** TrueForge, called by the Go backend through its language-neutral HTTP and Server-Sent Events API. The TypeScript SDK is not required by the backend.
-- **MCP:** Reuse the existing Kubernetes, Prometheus, and GitHub MCP servers. Implement `jev-mcp` in Go with the official MCP Go SDK.
+- **Model decisions:** Go `jev-mcp` calls the OpenAI Responses API and returns validated, schema-constrained JSON. OpenAI receives only minimized, redacted incident evidence; the customer supplies the API credential. The model cannot call infrastructure tools or authorize/execute actions.
+- **MCP:** Use `containers/kubernetes-mcp-server` for read-only Kubernetes investigation, `prometheus/prometheus-mcp` with a read-only tool allowlist, and GitHub's official `github/github-mcp-server` with read-only repository tools. Pin server images/releases by immutable version or digest. Implement `jev-mcp` in Go with the official MCP Go SDK.
 - **Persistence:** PostgreSQL for application service configuration, incident projections, decisions, approvals, and audit events. Redis supports the shared, multi-replica TrueForge deployment.
-- **Deployment:** containerized services deployed to Kubernetes.
+- **Deployment:** self-hosted, single-tenant installation in the customer's AWS account. The UI, Go backend, TrueForge workflow runtime, Jev MCP server, and application state run on the customer's production EKS cluster. A separate dedicated sandbox EKS cluster is required for remediation validation. PostgreSQL and Redis may be customer-managed services; in-cluster dependencies are supported only for development and non-production environments.
+- **Network boundary:** the installation initiates outbound connections to Alertmanager, configured integrations, GitHub, and OpenAI. It does not require inbound access from Knull-operated infrastructure. Production mutations use a separate, narrowly scoped identity and typed Go executor; the model and read-only MCP servers cannot mutate production.
 - **Gateways:** TrueFoundry MCP Gateway and AI Gateway remain optional integrations as described below.
 
 The frontend and backend communicate through a versioned HTTP API described by an OpenAPI contract; generate or validate the TypeScript client from that contract. Keep the Go services in one deployable backend initially, with Jev MCP as a separate process because it has its own MCP server contract.
+
+The initial production distribution is a customer-installed Helm release in the customer's AWS account. The customer provisions the production and sandbox EKS clusters and managed PostgreSQL/Redis endpoints. It has no required Knull-hosted control plane or telemetry dependency. A hosted control plane can be considered later as an optional deployment model; it must not be required for incident response or remediation in this release.
 
 ```text
 Alert source ──> Incident API ──> Durable workflow (TrueForge)
@@ -281,7 +289,7 @@ Alert source ──> Incident API ──> Durable workflow (TrueForge)
 - **Next.js GUI:** fleet, incident, timeline, approval, and recovery views. It does not contain privileged integration credentials.
 - **Go incident API/backend:** intake, service mapping, incident/event persistence, state transition validation, approval policy, production execution, recovery verification, and UI data access.
 - **TrueForge workflow:** durable orchestration, tool scheduling, context, pause/resume, subagents, sandbox invocation, and execution trace. The backend drives it through HTTP/SSE.
-- **MCP adapters:** provider-specific read and write tools. Reuse external Kubernetes, Prometheus, and GitHub servers; keep read and mutation permissions distinguishable.
+- **MCP adapters:** read-only external Kubernetes, Prometheus, and GitHub MCP servers. Production mutation is performed only by the typed Go executor after backend policy and approval checks.
 - **Jev MCP:** a Go MCP server for typed classification, next-action, risk, and recovery decisions.
 - **Policy/approval service:** enforces action allowlist, exact-action approval, approval freshness, and state preconditions.
 - **Sandbox adapter:** isolates validation from production and returns reproducible results.
@@ -373,7 +381,7 @@ Tests assert observable outcomes and safety properties rather than internal modu
 7. Approve and show the production resource change.
 8. Show live recovery signals: error rate, healthy pod count, and p95 latency, then show the incident's final recovery assessment.
 
-Example metric values in the PRD (including 97% confidence and specific before/after error rates or latency) are demo illustrations, not universal acceptance thresholds.
+Example confidence estimates and specific before/after error rates or latency in the PRD are demo illustrations, not calibrated probabilities or universal acceptance thresholds.
 
 ## 17. Delivery phases
 
@@ -386,15 +394,14 @@ Example metric values in the PRD (including 97% confidence and specific before/a
 
 ## 18. Open decisions before production use
 
-- Which alert provider and exact alert webhook contract will be supported first?
 - How are services mapped to namespaces, workloads, Prometheus labels, and GitHub repositories?
-- What sandbox technology and fidelity are available for each remediation type?
 - What Jev model/version provides each decision, and how are probabilities calibrated?
 - Which confidence/risk thresholds trigger more investigation or escalation? These thresholds must not bypass human approval.
 - What per-service recovery windows and signal thresholds define recovery?
-- Which approver identity source, approval expiry, and deployment role model are required?
+- What approval expiry is required? The installation runs in the customer account; its Kubernetes service accounts and RBAC must separate read, sandbox, and production mutation capabilities.
+- Which AWS workload identity configuration is required for optional AWS API integrations, and which exact outbound destinations must customers allow?
+- What OpenAI data-retention and regional requirements apply to customer incident evidence sent through the configured API credential?
 - What is the event and raw-log retention policy, and which fields require redaction?
-- Which exact Kubernetes MCP server and operations are available in the target environment?
 - What are the deployment SLOs for latency, availability, throughput, and cost?
 
 ## 19. References

@@ -71,9 +71,9 @@ logs: OOMKilled
   ↓
 GitHub MCP: latest deployment changed memory limit 1Gi → 256Mi
   ↓
-Jev: likely root cause is an incorrect memory limit (97% confidence)
+Jev: memory-limit regression is the leading hypothesis, backed by OOM and GitHub evidence
   ↓
-TrueForge sandbox: test proposed configuration at 1Gi
+dedicated sandbox EKS cluster: test proposed configuration at 1Gi
   ↓
 load test: error rate 0%, pods healthy 6/6
   ↓
@@ -165,7 +165,7 @@ Agent investigation
 ✓ Latest deployment checked
 
 Root cause
-Memory limit regression            97% confidence
+Memory limit regression            leading hypothesis; evidence linked
 
 Proposed fix
 256Mi → 1Gi
@@ -207,11 +207,11 @@ Infrastructure: Kubernetes / cloud / services
                     │
          remediation planner
                     │
-           TrueForge sandbox
+          dedicated sandbox EKS
                     │
            human approval
                     │
-       Kubernetes production MCP
+       typed Go production executor
                     │
            verify recovery
 ```
@@ -223,23 +223,25 @@ TrueForge is the primary agent harness. It handles:
 - Long-running investigation and context
 - Tools and MCP connections
 - Subagents for branching investigations
-- Sandboxed execution
 - Approval pauses
 - Recovery and resume
 - Execution trace
+
+Remediation validation runs in a customer-provisioned sandbox EKS cluster
+separate from production; TrueForge orchestrates the run but is not the
+security boundary.
 
 TrueFoundry uses TrueForge subagents for branching investigations and approval checkpoints before production-changing actions.
 
 ### MCP strategy
 
-Reuse existing MCP servers aggressively. Do not spend hackathon time building Kubernetes, Prometheus, or GitHub integrations from scratch. TrueForge can connect to catalog MCP servers or register remote MCP server URLs. The only MCP server to build for the MVP is **`jev-mcp`**, which exposes the project's differentiating decision layer.
+Reuse existing read-only MCP servers aggressively. TrueForge can connect to catalog MCP servers or register remote MCP server URLs. Build **`jev-mcp`** and the typed Go policy/execution services. External MCP servers never receive production mutation credentials.
 
-**Kubernetes MCP** — read tools run freely; production mutation tools require approval.
+**Kubernetes MCP** — use `containers/kubernetes-mcp-server` in read-only mode, with Secret access denied. Production writes are performed only by the typed Go executor after backend policy and action-bound human approval.
 
 ```text
 list_pods · describe_pod · get_deployment · get_events
-get_logs · get_resource_usage · restart_workload
-patch_deployment · scale_deployment
+get_logs · get_resource_usage
 ```
 
 **Prometheus MCP**
@@ -248,11 +250,15 @@ patch_deployment · scale_deployment
 query_metric · query_range · get_alert
 ```
 
-Used for CPU, memory, latency, errors, saturation, and traffic.
+Use `prometheus/prometheus-mcp` with a read-only allowlist for CPU, memory,
+latency, errors, saturation, traffic, alert, and metric queries. Disable
+administrative tools.
 
 **GitHub MCP**
 
-Used to inspect recent commits and PRs, deployment configuration, Kubernetes manifests, and other recent changes.
+Use GitHub's official MCP server in read-only mode with a customer-installed
+GitHub App scoped to mapped repositories. Inspect recent commits and PRs,
+deployment configuration, Kubernetes manifests, and other changes.
 
 **Optional:** Grafana, Loki, or Slack MCP only after the core flow works.
 
@@ -266,7 +272,7 @@ The AI Gateway is optional and can provide budgets, rate limits, and traces with
 
 ## 9. Jev decision engine
 
-Jev is the **decision engine**, not the investigator. TrueForge gathers evidence; Jev turns it into typed decisions with calibrated probabilities so the workflow can act above a threshold and request review when uncertainty is higher.
+Jev is the **decision layer**, not the investigator. TrueForge gathers evidence; the Go `jev-mcp` service calls the OpenAI Responses API with schema-constrained output and returns typed recommendations. The Go service validates output and evidence references. Confidence is not presented as calibrated until an evaluation and calibration process supports that claim. Jev cannot authorize or execute actions.
 
 Expose decisions through `jev-mcp`:
 
@@ -286,7 +292,7 @@ Possible levels: `LOW`, `MEDIUM`, `HIGH`.
 
 Possible outcomes: `RECOVERED`, `PARTIALLY_RECOVERED`, `NOT_RECOVERED`, `UNCERTAIN`.
 
-Every decision returns a probability or confidence value. Example:
+Decisions may include uncertainty and supporting evidence. Any numeric confidence is labeled uncalibrated until validated. Example:
 
 ```text
 BAD_DEPLOYMENT      0.94
@@ -314,7 +320,13 @@ observe metrics
 validate behavior
 ```
 
-TrueForge's sandbox isolates local execution while keeping external tool credentials on the harness side.
+Validation uses a customer-provisioned EKS cluster separate from every
+production cluster. Each run gets a fresh namespace with quotas, restricted Pod
+Security settings, disabled service-account token automount, default-deny
+network policy, sanitized workload configuration, and no production credentials
+or production data. The namespace is deleted after the run; the dedicated
+cluster, not the namespace, is the production isolation boundary. Missing or
+failed isolation blocks approval.
 
 ## 11. Human approval and safety boundary
 
@@ -324,9 +336,6 @@ Production mutation is the line the agent cannot cross alone. Require approval f
 - Scaling replicas
 - Modifying CPU or memory
 - Rolling back a deployment
-- Modifying infrastructure or production configuration
-- Deleting a resource
-- Blocking an IP
 
 Read operations run without approval. The production action screen must show the exact proposed change, expected impact, and validation evidence. The agent pauses for a human decision before mutation.
 
@@ -414,8 +423,8 @@ The MVP succeeds if:
 1. Show checkout-api in the fleet with an active incident: error rate 41%, healthy pods 4/6, p95 latency 3.2s.
 2. Start the TrueForge investigation and show real MCP activity: Prometheus query, Kubernetes inspection, pod events and logs, and recent deployment correlation.
 3. Show the evidence: two pods OOMKilled and a recent memory limit change from `1Gi` to `256Mi`.
-4. Show Jev's structured root-cause decision and 97% confidence.
-5. Show the proposed `256Mi → 1Gi` fix being tested in a sandbox under load, with zero crashes, error rate below 1%, and p95 latency near 190ms.
+4. Show Jev's structured leading hypothesis with linked evidence and clearly labeled uncertainty.
+5. Show the proposed `256Mi → 1Gi` fix being tested in the separate sandbox EKS cluster under load, with zero crashes, error rate below 1%, and p95 latency near 190ms.
 6. Stop at the approval screen. Show the exact production change and expected pod rollout.
 7. Click APPLY and show the production Kubernetes resource changing.
 8. Show live recovery: error rate 41% → 0.3%, healthy pods 4/6 → 6/6, p95 latency 3.2s → 184ms.
@@ -424,15 +433,24 @@ The MVP succeeds if:
 
 ```text
 Agent runtime      TrueForge
-Models             TrueFoundry AI Gateway (optional)
-Decision model     Jev
+Models             OpenAI API
+Decision model     Go Jev MCP (schema-validated OpenAI Responses API)
 Agent tools        MCP
-Infrastructure     Kubernetes
+Infrastructure     AWS EKS in the customer account
 Metrics            Prometheus
 Logs               Kubernetes logs (Loki optional)
-Source control     GitHub MCP
-Sandbox            TrueForge sandbox
-Backend            TypeScript / Node.js
-Frontend           Next.js
-State              SQLite
+Alert intake       Prometheus Alertmanager webhook
+Source control     GitHub official MCP (read-only)
+Sandbox            Dedicated customer EKS cluster, separate from production
+Backend            Go (`net/http`) + Go `jev-mcp`
+Frontend           Next.js / TypeScript
+State              PostgreSQL + Redis
+Operator sign-in   Customer OIDC provider (Keycloak for local development)
 ```
+
+The initial release is self-hosted in the customer's AWS account. The UI,
+backend, workflow runtime, Jev, and state run on the customer's production EKS
+cluster. Remediation validation runs only on a separate sandbox EKS cluster.
+The customer supplies the OpenAI API credential; minimized, redacted incident
+evidence is sent to the configured OpenAI API. The model recommends actions but
+cannot approve or execute production changes.

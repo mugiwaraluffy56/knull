@@ -7,10 +7,11 @@ Monitoring tells you that production is broken. Knull works out why. It tests a
 fix, then puts production one click away from recovery.
 
 > [!NOTE]
-> Knull is in design. This repo holds the product spec in
-> [`docs/PRD.md`](docs/PRD.md). The code is not written yet, so there is nothing
-> to install so far. This README explains the plan and will grow as the code
-> lands.
+> Knull is in design. The product brief is in [`docs/PRD.md`](docs/PRD.md),
+> the detailed behavior and architecture are in [`docs/SPEC.md`](docs/SPEC.md),
+> and the implementation checklist is in
+> [`docs/IMPLEMENT.md`](docs/IMPLEMENT.md). The application code is not written
+> yet, so this README describes the agreed implementation plan.
 
 ## Why this matters
 
@@ -57,7 +58,7 @@ incident detected
   -> Kubernetes: 2 pods in CrashLoopBackOff
   -> logs: OOMKilled
   -> GitHub: last deploy cut the memory limit from 1Gi to 256Mi
-  -> Jev: the memory limit is the likely cause (97% confidence)
+  -> Jev: memory-limit regression is the leading hypothesis, backed by OOM and GitHub evidence
   -> sandbox: try 1Gi under load
   -> load test: 0% errors, 6/6 pods healthy
   -> fix ready for approval
@@ -92,31 +93,29 @@ it wants. Writes are not free. Each of these needs a human to say yes:
 - Scale replicas
 - Change CPU or memory
 - Roll back a deployment
-- Change infrastructure or production config
-- Delete a resource
-- Block an IP
 
 Before you decide, the screen shows the exact change, what it will do, and the
-sandbox results that back it up.
+sandbox results from a dedicated EKS cluster separate from production.
 
 ## Parts of the system
 
 | Part | What it does |
 | --- | --- |
-| **TrueForge** | The agent harness. It runs the long investigation, holds context, calls tools, spawns subagents, runs the sandbox, and pauses for approval. |
-| **Jev** | The decision engine. TrueForge gathers proof; Jev turns that proof into a typed decision with a confidence score. |
-| **`jev-mcp`** | The one MCP server this project builds. It exposes Jev's decisions as tools. |
-| **Kubernetes MCP** | Reads cluster state. Also holds the guarded write tools. |
-| **Prometheus MCP** | Runs metric queries for CPU, memory, latency, errors, and traffic. |
-| **GitHub MCP** | Reads recent commits, pull requests, and manifests to spot what changed. |
+| **TrueForge** | The agent harness. It runs the long investigation, holds context, calls tools, spawns subagents, and pauses for approval. |
+| **Jev** | The OpenAI-backed decision layer. It turns evidence into schema-validated typed recommendations; it cannot approve or execute changes. |
+| **`jev-mcp`** | The Go MCP server this project builds. It exposes Jev's structured decisions as tools. |
+| **Kubernetes MCP** | A pinned, read-only MCP server for cluster investigation. A separate typed Go executor applies approved changes. |
+| **Prometheus MCP** | A pinned, read-only MCP server for alert and metric queries. |
+| **GitHub MCP** | GitHub's official MCP server, restricted to read-only access on mapped repositories. |
 | **Next.js GUI** | Shows the fleet, the live investigation, the approval screen, and recovery. |
 
-Knull reuses MCP servers that already exist for Kubernetes, Prometheus, and
-GitHub. It only builds `jev-mcp`, because that is the part that is new.
+Knull reuses MCP servers for Kubernetes, Prometheus, and GitHub. It builds
+`jev-mcp` and the backend policy/execution services. External MCP servers are
+not granted production mutation credentials.
 
 ### What Jev decides
 
-Jev answers four questions, and each answer carries a probability:
+Jev answers four questions with typed results, evidence references, and uncertainty:
 
 - `classify_incident` - is this `RESOURCE_EXHAUSTION`, `BAD_DEPLOYMENT`,
   `DEPENDENCY_FAILURE`, `TRAFFIC_SPIKE`, `CONFIGURATION_ERROR`, or `UNKNOWN`?
@@ -126,8 +125,9 @@ Jev answers four questions, and each answer carries a probability:
 - `verify_recovery` - is the service `RECOVERED`, `PARTIALLY_RECOVERED`,
   `NOT_RECOVERED`, or `UNCERTAIN`?
 
-Scores matter here. Knull can act when a score is high. When it is low, Knull
-hands the incident to a person instead of guessing.
+Scores help Knull decide whether to gather more evidence or escalate. They never
+authorize a production change: every production mutation requires a fresh human
+approval bound to the exact proposed action.
 
 ## Scope
 
@@ -145,38 +145,45 @@ Knull handles three kinds of incident to start:
 > without approval, a learning system, and role-based access control. The goal
 > is one loop that works well.
 
-## Planned stack
+## Planned stack and deployment
 
 ```text
 Agent runtime      TrueForge
-Decision model     Jev
+Decision model     OpenAI API through Go Jev MCP
 Agent tools        MCP
-Infrastructure     Kubernetes
+Infrastructure     AWS EKS (customer account)
 Metrics            Prometheus
 Logs               Kubernetes logs
-Source control     GitHub MCP
-Sandbox            TrueForge sandbox
-Backend            TypeScript / Node.js
-Frontend           Next.js
-State              SQLite
+Source control     GitHub official MCP (read-only)
+Alert intake       Prometheus Alertmanager webhook
+Sandbox            Separate customer EKS cluster; fresh namespace per run
+Backend            Go (`net/http`) + Go Jev MCP
+Frontend           Next.js / TypeScript
+State              PostgreSQL + Redis
+Operator sign-in   Customer OIDC provider; Keycloak in local development
 ```
 
-To run Knull later, you will need a Kubernetes cluster, Prometheus scraping it,
-a GitHub repo with your manifests, and Node.js. Setup steps go here once the
-code exists.
+The initial install runs in the customer's AWS account. It requires a
+production EKS cluster, a separate sandbox EKS cluster, customer-managed
+PostgreSQL and Redis, Prometheus/Alertmanager, and a read-only GitHub App. The
+customer configures the OpenAI API credential; redacted incident evidence is
+sent to that API. Setup steps will be documented with the implementation.
 
 ## Repo layout
 
 ```text
-docs/PRD.md    The product spec. Start here.
-README.md      This file.
+docs/PRD.md       The product brief.
+docs/SPEC.md      Detailed product and architecture specification.
+docs/IMPLEMENT.md Dependency-ordered implementation checklist.
+README.md         This file.
 ```
 
 More directories will show up as the code grows. This section will track them.
 
 ## Contributing
 
-Read [`docs/PRD.md`](docs/PRD.md) first. It is the source of truth for what
-Knull should do, and it explains the choices behind the design.
+Read [`docs/PRD.md`](docs/PRD.md) for the product brief and
+[`docs/SPEC.md`](docs/SPEC.md) for the source of truth on product behavior and
+architecture. Use [`docs/IMPLEMENT.md`](docs/IMPLEMENT.md) to track delivery.
 
 Please sign off your commits with `git commit -s`.
