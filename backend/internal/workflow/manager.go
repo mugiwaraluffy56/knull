@@ -59,7 +59,7 @@ func (m *Manager) StartForIncident(ctx context.Context, inc incidents.Incident) 
 	}
 	m.tryTransition(ctx, inc.ID, incidents.StateInvestigating, "investigation started")
 
-	go m.consume(context.Background(), inc.ID, session.ID)
+	go m.consume(context.Background(), inc.ID, session.ID, session.RunID)
 	return nil
 }
 
@@ -74,19 +74,19 @@ func (m *Manager) ResumeAll(ctx context.Context) error {
 	}
 	for _, inc := range resumable {
 		m.logger.Info("resuming workflow", "incident", inc.ID, "session", inc.WorkflowSessionID)
-		go m.consume(context.Background(), inc.ID, inc.WorkflowSessionID)
+		go m.consume(context.Background(), inc.ID, inc.WorkflowSessionID, inc.WorkflowRunID)
 	}
 	return nil
 }
 
 // consume streams a session's events and applies each, with bounded retries for
 // transient stream drops. An unavailable session escalates the incident.
-func (m *Manager) consume(ctx context.Context, incidentID uuid.UUID, sessionID string) {
+func (m *Manager) consume(ctx context.Context, incidentID uuid.UUID, sessionID, runID string) {
 	const maxRetries = 5
 	backoff := 500 * time.Millisecond
 
 	for attempt := 0; ; attempt++ {
-		ch, err := m.runtime.StreamEvents(ctx, sessionID)
+		ch, err := m.runtime.StreamEvents(ctx, sessionID, runID)
 		if err != nil {
 			if errors.Is(err, ErrSessionUnavailable) {
 				m.failIncident(ctx, incidentID, "workflow session unavailable")

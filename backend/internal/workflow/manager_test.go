@@ -25,7 +25,7 @@ func (f *fakeRuntime) StartSession(context.Context, StartRequest) (Session, erro
 	}
 	return f.session, nil
 }
-func (f *fakeRuntime) StreamEvents(context.Context, string) (<-chan RuntimeEvent, error) {
+func (f *fakeRuntime) StreamEvents(context.Context, string, string) (<-chan RuntimeEvent, error) {
 	if f.streamErr != nil {
 		return nil, f.streamErr
 	}

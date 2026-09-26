@@ -2,9 +2,8 @@
 // agent runtime and streams their progress into the incident event model.
 //
 // TrueForge is reached over a language-neutral HTTP + Server-Sent Events API, so
-// the backend needs no TypeScript SDK. The concrete HTTP client here targets a
-// documented-assumed TrueForge contract (see httpRuntime); the Runtime interface
-// keeps the orchestration decoupled from that contract and testable with a fake.
+// the backend needs no TypeScript SDK. The concrete HTTP client uses the
+// published session and turn API; the Runtime interface remains testable.
 package workflow
 
 import (
@@ -15,6 +14,7 @@ import (
 // ErrSessionUnavailable indicates the runtime could not be reached or the
 // session does not exist.
 var ErrSessionUnavailable = errors.New("workflow session unavailable")
+var ErrUnsupportedControl = errors.New("workflow control unsupported by TrueForge")
 
 // EventKind classifies a runtime event.
 type EventKind string
@@ -59,11 +59,11 @@ type StartRequest struct {
 type Runtime interface {
 	// StartSession begins a durable workflow for an incident.
 	StartSession(ctx context.Context, req StartRequest) (Session, error)
-	// StreamEvents returns a channel of events for a session. The channel closes
+	// StreamEvents returns a channel of events for a persisted turn. The channel closes
 	// when the stream ends; implementations should reconnect internally for
 	// transient drops and return ErrSessionUnavailable when the session is gone.
-	StreamEvents(ctx context.Context, sessionID string) (<-chan RuntimeEvent, error)
-	// Pause, Resume, and Cancel control a session.
+	StreamEvents(ctx context.Context, sessionID, runID string) (<-chan RuntimeEvent, error)
+	// Pause and Resume fail closed when unsupported. Cancel stops the last turn.
 	Pause(ctx context.Context, sessionID string) error
 	Resume(ctx context.Context, sessionID string) error
 	Cancel(ctx context.Context, sessionID string) error
