@@ -304,7 +304,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - An unknown scenario escalates rather than presenting a fabricated root cause.
 - Every displayed claim links to evidence or is labeled as a hypothesis.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; CI passed. PR/commit: db0d853 (live Jev model call pending)
 
 ### 15. Select the next investigation or response action
 
