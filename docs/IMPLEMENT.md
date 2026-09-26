@@ -199,7 +199,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Sensitive values and private model reasoning are absent from the timeline.
 - Empty, loading, and failed states are handled clearly.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: 622e9ad
+**Completion:** [x] Code pushed; verification passes. PR/commit: 393fd95
 
 ### 10. Show Kubernetes findings in incidents
 
