@@ -264,7 +264,7 @@ export interface paths {
         put?: never;
         /**
          * Run read-only investigation for an incident
-         * @description Runs the connected read-only investigators (Kubernetes, and later Prometheus and GitHub) and records the gathered evidence on the incident's timeline.
+         * @description Runs the connected read-only investigators and records evidence. When Jev is configured, classifies incident causes from available evidence, records ranked hypotheses, and escalates uncertain results.
          *
          */
         post: operations["collectEvidence"];
@@ -1033,6 +1033,13 @@ export interface operations {
             };
             /** @description Incident not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Evidence collected, but Jev classification failed. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

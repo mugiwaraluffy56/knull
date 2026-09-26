@@ -8,12 +8,17 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
+	"github.com/mugiwaraluffy56/knull/backend/internal/jev"
 )
 
 // evidenceCollector runs the connected read-only investigators for an incident.
 type evidenceCollector interface {
 	Collect(ctx context.Context, incidentID uuid.UUID) error
 	Enabled() bool
+}
+
+type incidentClassifier interface {
+	Classify(ctx context.Context, incidentID uuid.UUID) (jev.ClassificationResult, error)
 }
 
 // EvidenceCollector is the exported alias used when wiring the server.
@@ -38,6 +43,12 @@ func (s *Server) handleCollectEvidence(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if s.classifier != nil {
+		if _, err := s.classifier.Classify(r.Context(), id); err != nil {
+			writeError(w, http.StatusBadGateway, "evidence collected, but classification failed: "+err.Error())
+			return
+		}
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"status": "collected"})
 }

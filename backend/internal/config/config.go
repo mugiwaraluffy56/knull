@@ -66,6 +66,9 @@ type Config struct {
 	// GitHubMCPURL / GitHubMCPToken address the read-only GitHub MCP server.
 	GitHubMCPURL   string
 	GitHubMCPToken string
+	// JevMCPURL connects the decision-only server. Empty disables classification.
+	JevMCPURL        string
+	JevMinConfidence float64
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -115,6 +118,15 @@ func Load() (Config, error) {
 		PrometheusMCPToken:    os.Getenv("KNULL_PROMETHEUS_MCP_TOKEN"),
 		GitHubMCPURL:          os.Getenv("KNULL_GITHUB_MCP_URL"),
 		GitHubMCPToken:        os.Getenv("KNULL_GITHUB_MCP_TOKEN"),
+		JevMCPURL:             os.Getenv("KNULL_JEV_MCP_URL"),
+		JevMinConfidence:      0.65,
+	}
+	if raw := os.Getenv("KNULL_JEV_MIN_CONFIDENCE"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value <= 0 || value > 1 {
+			return Config{}, fmt.Errorf("KNULL_JEV_MIN_CONFIDENCE must be in (0, 1]")
+		}
+		c.JevMinConfidence = value
 	}
 
 	if d, err := durationSeconds("KNULL_SESSION_TTL_SECONDS"); err != nil {

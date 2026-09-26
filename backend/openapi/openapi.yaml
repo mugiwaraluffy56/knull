@@ -382,9 +382,9 @@ paths:
       operationId: collectEvidence
       summary: Run read-only investigation for an incident
       description: >
-        Runs the connected read-only investigators (Kubernetes, and later
-        Prometheus and GitHub) and records the gathered evidence on the
-        incident's timeline.
+        Runs the connected read-only investigators and records evidence. When
+        Jev is configured, classifies incident causes from available evidence,
+        records ranked hypotheses, and escalates uncertain results.
       parameters:
         - $ref: "#/components/parameters/IncidentId"
       responses:
@@ -396,6 +396,8 @@ paths:
           description: Incident not found.
         "503":
           description: No investigation integrations connected.
+        "502":
+          description: Evidence collected, but Jev classification failed.
   /api/incidents/{id}/events:
     get:
       operationId: listIncidentEvents

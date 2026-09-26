@@ -42,6 +42,7 @@ type Options struct {
 	FleetIncidents fleetIncidentSource
 	Workflow       workflowStarter
 	Collector      evidenceCollector
+	Classifier     incidentClassifier
 	AlertIntake    alertIntake
 	AlertFailures  failureRecorder
 	AlertSecret    string
@@ -64,6 +65,7 @@ type Server struct {
 	fleetIncidents fleetIncidentSource
 	workflow       workflowStarter
 	collector      evidenceCollector
+	classifier     incidentClassifier
 	alertIntake    alertIntake
 	alertFailures  failureRecorder
 	alertSecret    string
@@ -93,6 +95,7 @@ func New(opts Options) *Server {
 		fleetIncidents: opts.FleetIncidents,
 		workflow:       opts.Workflow,
 		collector:      opts.Collector,
+		classifier:     opts.Classifier,
 		alertIntake:    opts.AlertIntake,
 		alertFailures:  opts.AlertFailures,
 		alertSecret:    opts.AlertSecret,

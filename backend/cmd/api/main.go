@@ -17,6 +17,7 @@ import (
 
 	"github.com/mugiwaraluffy56/knull/backend/internal/alerts"
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
+	"github.com/mugiwaraluffy56/knull/backend/internal/classify"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
 	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
@@ -110,6 +111,11 @@ func run(logger *slog.Logger) error {
 		collector = investigate.NewCollector(incidentStore, serviceStore, k8sInvestigator, prometheusInvestigator)
 		collector.WithGitHub(githubInvestigator)
 	}
+	var classifier *classify.Service
+	if cfg.JevMCPURL != "" {
+		classifier = classify.NewService(incidentStore, &classify.MCPClient{Endpoint: cfg.JevMCPURL}, cfg.JevMinConfidence)
+		logger.Info("Jev classification enabled", "url", cfg.JevMCPURL)
+	}
 
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
@@ -152,6 +158,7 @@ func run(logger *slog.Logger) error {
 			FleetIncidents: incidentStore,
 			Workflow:       workflowStarterOrNil(workflowManager),
 			Collector:      collectorOrNil(collector),
+			Classifier:     classifier,
 			AlertIntake:    alertIntake,
 			AlertFailures:  alertFailures,
 			AlertSecret:    cfg.AlertmanagerSecret,

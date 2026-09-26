@@ -113,7 +113,7 @@ export default function IncidentPage({
         ) : (
           <ol className="timeline">
             {events.map((e) => (
-              <li key={e.id} className="timeline-item">
+              <li key={e.id} id={`event-${e.id}`} className="timeline-item">
                 <span className={`cat cat-${e.category ?? "system"}`}>
                   {e.category ?? "system"}
                 </span>
@@ -134,6 +134,7 @@ export default function IncidentPage({
                   <span className="timeline-actor"> · {e.actor || "system"}</span>
                   {e.source === "prometheus" && <PrometheusFinding event={e} />}
                   {e.source === "github" && <GitHubFinding event={e} />}
+                  {e.source === "jev" && <JevClassification event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -149,6 +150,23 @@ export default function IncidentPage({
       </section>
     </main>
   );
+}
+
+function JevClassification({ event }: { event: IncidentEvent }) {
+  const data = event.data;
+  if (!data || typeof data.decision !== "object" || data.decision === null) return null;
+  const decision = data.decision as { classes?: Array<{ class?: string; confidence?: number; evidence_ids?: string[] }>; rationale?: string };
+  const metadata = data.metadata as { model?: string; decision_version?: string; calibrated?: boolean } | undefined;
+  const classes = Array.isArray(decision.classes) ? decision.classes : [];
+  return <div className="metric-finding">
+    <strong>Cause hypotheses</strong>
+    {classes.map((hypothesis, index) => <div key={index}>
+      {index + 1}. {hypothesis.class} · {typeof hypothesis.confidence === "number" ? `${Math.round(hypothesis.confidence * 100)}% model confidence` : "confidence unavailable"}
+      {Array.isArray(hypothesis.evidence_ids) && hypothesis.evidence_ids.length > 0 && <span> · evidence: {hypothesis.evidence_ids.map((id, refIndex) => <span key={id}>{refIndex > 0 ? ", " : ""}<a href={`#event-${id}`}>{id.slice(0, 8)}</a></span>)}</span>}
+    </div>)}
+    {decision.rationale && <div>Hypothesis summary: {decision.rationale}</div>}
+    {metadata && <div className="auth-muted">{metadata.model} · {metadata.decision_version} · {metadata.calibrated ? "calibrated" : "uncalibrated confidence"}</div>}
+  </div>;
 }
 
 function PrometheusFinding({ event }: { event: IncidentEvent }) {
