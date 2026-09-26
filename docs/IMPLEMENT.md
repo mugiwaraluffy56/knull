@@ -240,7 +240,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - A query error or empty series is distinguishable from a zero value.
 - Queries for one environment cannot return results for another through the service mapping.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; verification passes. PR/commit: ba0b65e (live Prometheus + MCP server verify pending)
 
 ### 12. Correlate GitHub deployment changes
 
