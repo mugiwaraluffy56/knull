@@ -361,7 +361,7 @@ export interface components {
                 finishedAt: string;
                 cleanupVerified: boolean;
                 /** @enum {string} */
-                status: "prepared" | "failed";
+                status: "prepared" | "checked" | "failed";
                 error?: string;
             };
         };

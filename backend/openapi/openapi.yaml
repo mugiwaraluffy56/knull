@@ -536,7 +536,7 @@ components:
             startedAt: { type: string, format: date-time }
             finishedAt: { type: string, format: date-time }
             cleanupVerified: { type: boolean }
-            status: { type: string, enum: [prepared, failed] }
+            status: { type: string, enum: [prepared, checked, failed] }
             error: { type: string }
     ActionTarget:
       type: object

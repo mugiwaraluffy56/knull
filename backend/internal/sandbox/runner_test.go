@@ -84,3 +84,26 @@ func TestSandboxFailsClosed(t *testing.T) {
 		t.Fatalf("unenforced controls accepted: %v", err)
 	}
 }
+
+func TestSandboxChecksRunBeforeCleanupAndBaselineUsesCurrentValue(t *testing.T) {
+	action, workload := candidate()
+	cluster := &fakeCluster{uid: "sandbox-uid"}
+	runner := NewRunner(cluster, Config{ClusterUID: "sandbox-uid", ProductionClusterUIDs: []string{"prod-uid"}, AllowedImageRegistry: "registry.example"})
+	baseline := workload
+	baseline.Memory = action.CurrentValue
+	run, err := runner.RunBaselineWithCheck(context.Background(), action, baseline, func(_ context.Context, namespace string) error {
+		if namespace == "" || cluster.deleted {
+			t.Fatal("check did not run inside active namespace")
+		}
+		return nil
+	})
+	if err != nil || run.Status != "checked" || !run.CleanupVerified || !cluster.deleted {
+		t.Fatalf("baseline run failed: %+v %v", run, err)
+	}
+	cluster = &fakeCluster{uid: "sandbox-uid"}
+	runner = NewRunner(cluster, Config{ClusterUID: "sandbox-uid", ProductionClusterUIDs: []string{"prod-uid"}, AllowedImageRegistry: "registry.example"})
+	run, err = runner.RunWithCheck(context.Background(), action, workload, func(context.Context, string) error { return errors.New("bad metrics") })
+	if err == nil || run.Status == "checked" || !run.CleanupVerified {
+		t.Fatalf("failed check passed: %+v %v", run, err)
+	}
+}

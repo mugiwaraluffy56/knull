@@ -72,6 +72,25 @@ var imageRef = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]+@sha256:[a-f0-9]{64}$`
 // resource fields. It always attempts deletion and verifies that cleanup ended.
 // It does not claim validation passed; Task 18 supplies independent checks.
 func (r *Runner) Run(ctx context.Context, action actions.Contract, workload Workload) (result Run, runErr error) {
+	return r.RunWithCheck(ctx, action, workload, nil)
+}
+
+// RunWithCheck executes a bounded verification callback while the candidate
+// still exists. A successful callback is required before status becomes checked.
+func (r *Runner) RunWithCheck(ctx context.Context, action actions.Contract, workload Workload, check func(context.Context, string) error) (result Run, runErr error) {
+	return r.run(ctx, action, workload, check, false)
+}
+
+// RunBaselineWithCheck reproduces the action's observed current memory limit
+// in a separate run namespace. Only memory adjustments support this mode.
+func (r *Runner) RunBaselineWithCheck(ctx context.Context, action actions.Contract, workload Workload, check func(context.Context, string) error) (Run, error) {
+	if action.Type != actions.Memory {
+		return Run{}, fmt.Errorf("%w: baseline only supports memory actions", ErrIsolation)
+	}
+	return r.run(ctx, action, workload, check, true)
+}
+
+func (r *Runner) run(ctx context.Context, action actions.Contract, workload Workload, check func(context.Context, string) error, baseline bool) (result Run, runErr error) {
 	result = Run{ID: uuid.New(), ActionDigest: action.Digest, ActionVersion: action.Version, Workload: workload, StartedAt: time.Now().UTC(), Status: "failed"}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
@@ -82,7 +101,7 @@ func (r *Runner) Run(ctx context.Context, action actions.Contract, workload Work
 	if err := action.Validate(); err != nil {
 		return result, err
 	}
-	if err := r.validateConfig(ctx, action, workload); err != nil {
+	if err := r.validateConfig(ctx, action, workload, baseline); err != nil {
 		return result, err
 	}
 	result.ClusterUID = r.config.ClusterUID
@@ -105,7 +124,11 @@ func (r *Runner) Run(ctx context.Context, action actions.Contract, workload Work
 			result.CleanupVerified = true
 		}
 		if runErr == nil {
-			result.Status = "prepared"
+			if check == nil {
+				result.Status = "prepared"
+			} else {
+				result.Status = "checked"
+			}
 		}
 	}()
 	for _, manifest := range manifests(result.Namespace, result.ID, action, workload, r.config.PullSecretName) {
@@ -116,12 +139,17 @@ func (r *Runner) Run(ctx context.Context, action actions.Contract, workload Work
 	if err := r.client.VerifyControls(runCtx, result.Namespace, workload); err != nil {
 		return result, fmt.Errorf("%w: controls not enforced: %v", ErrIsolation, err)
 	}
+	if check != nil {
+		if err := check(runCtx, result.Namespace); err != nil {
+			return result, fmt.Errorf("sandbox check failed: %w", err)
+		}
+	}
 	result.Limitations = []string{"candidate workload uses sanitized configuration only", "application dependencies and production data are absent unless independently staged"}
 	result.EnvironmentDifferences = []string{"dedicated sandbox cluster", "new run namespace", "no production Secrets or data", "network ingress and egress denied by default"}
 	return result, nil
 }
 
-func (r *Runner) validateConfig(ctx context.Context, action actions.Contract, workload Workload) error {
+func (r *Runner) validateConfig(ctx context.Context, action actions.Contract, workload Workload, baseline bool) error {
 	if r.client == nil || r.config.ClusterUID == "" || len(r.config.ProductionClusterUIDs) == 0 || r.config.ProductionClusterUIDs[0] == "" || r.config.AllowedImageRegistry == "" {
 		return fmt.Errorf("%w: cluster identity and image policy must be configured", ErrIsolation)
 	}
@@ -142,7 +170,11 @@ func (r *Runner) validateConfig(ctx context.Context, action actions.Contract, wo
 	}
 	switch action.Type {
 	case actions.Memory:
-		if workload.Memory != action.DesiredValue {
+		expected := action.DesiredValue
+		if baseline {
+			expected = action.CurrentValue
+		}
+		if workload.Memory != expected {
 			return fmt.Errorf("%w: candidate memory differs from action", ErrIsolation)
 		}
 	case actions.CPU:
