@@ -1,0 +1,33 @@
+# Replace both placeholders after reviewing the approved production target.
+# This Role grants no access to pods, secrets, namespaces, or other workloads.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: knull-production-executor
+  namespace: REPLACE_NAMESPACE
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: knull-production-executor
+  namespace: REPLACE_NAMESPACE
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["REPLACE_WORKLOAD"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: knull-production-executor
+  namespace: REPLACE_NAMESPACE
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: knull-production-executor
+subjects:
+  - kind: ServiceAccount
+    name: knull-production-executor
+    namespace: REPLACE_NAMESPACE

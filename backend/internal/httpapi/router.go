@@ -45,6 +45,7 @@ type Options struct {
 	Classifier      incidentClassifier
 	ActionPlanner   actionPlanner
 	Approvals       approvalDecider
+	Executor        productionExecutor
 	Sandbox         sandboxPreparer
 	MemoryValidator memoryValidator
 	AlertIntake     alertIntake
@@ -72,6 +73,7 @@ type Server struct {
 	classifier      incidentClassifier
 	actionPlanner   actionPlanner
 	approvals       approvalDecider
+	executor        productionExecutor
 	sandbox         sandboxPreparer
 	memoryValidator memoryValidator
 	alertIntake     alertIntake
@@ -106,6 +108,7 @@ func New(opts Options) *Server {
 		classifier:      opts.Classifier,
 		actionPlanner:   opts.ActionPlanner,
 		approvals:       opts.Approvals,
+		executor:        opts.Executor,
 		sandbox:         opts.Sandbox,
 		memoryValidator: opts.MemoryValidator,
 		alertIntake:     opts.AlertIntake,
@@ -153,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/incidents/{id}/validations/memory", s.requireOperator(http.HandlerFunc(s.handleValidateMemory)))
 	mux.Handle("POST /api/incidents/{id}/approvals", s.requireOperator(http.HandlerFunc(s.handleApproveAction)))
 	mux.Handle("POST /api/incidents/{id}/denials", s.requireOperator(http.HandlerFunc(s.handleDenyAction)))
+	mux.Handle("POST /api/incidents/{id}/executions/memory", s.requireOperator(http.HandlerFunc(s.handleExecuteMemory)))
 
 	return s.withCORS(mux)
 }

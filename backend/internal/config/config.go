@@ -84,6 +84,13 @@ type Config struct {
 	SandboxPrometheusToken string
 	SandboxErrorRateQuery  string
 	SandboxP95Query        string
+	// Production execution is opt-in and bound to one pinned in-cluster API
+	// server CA, cluster name, namespace, and workload.
+	ProductionExecutionEnabled bool
+	ProductionCluster          string
+	ProductionNamespace        string
+	ProductionWorkload         string
+	ProductionCASHA256         string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -147,6 +154,20 @@ func Load() (Config, error) {
 		SandboxPrometheusToken:   os.Getenv("KNULL_SANDBOX_PROMETHEUS_TOKEN"),
 		SandboxErrorRateQuery:    os.Getenv("KNULL_SANDBOX_ERROR_RATE_QUERY"),
 		SandboxP95Query:          os.Getenv("KNULL_SANDBOX_P95_QUERY"),
+		ProductionCluster:        os.Getenv("KNULL_PRODUCTION_CLUSTER"),
+		ProductionNamespace:      os.Getenv("KNULL_PRODUCTION_NAMESPACE"),
+		ProductionWorkload:       os.Getenv("KNULL_PRODUCTION_WORKLOAD"),
+		ProductionCASHA256:       os.Getenv("KNULL_PRODUCTION_CA_SHA256"),
+	}
+	if raw := os.Getenv("KNULL_PRODUCTION_EXECUTION_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("KNULL_PRODUCTION_EXECUTION_ENABLED must be true or false")
+		}
+		c.ProductionExecutionEnabled = enabled
+	}
+	if c.ProductionExecutionEnabled && (c.ProductionCluster == "" || c.ProductionNamespace == "" || c.ProductionWorkload == "" || len(c.ProductionCASHA256) != 64) {
+		return Config{}, fmt.Errorf("production execution requires exact cluster, namespace, workload, and 64-character CA SHA256")
 	}
 	if raw := os.Getenv("KNULL_TRUEFORGE_VALIDATION_TOOLS"); raw != "" {
 		for _, tool := range strings.Split(raw, ",") {

@@ -21,6 +21,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/classify"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
+	"github.com/mugiwaraluffy56/knull/backend/internal/executor"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
 	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
 	"github.com/mugiwaraluffy56/knull/backend/internal/investigate"
@@ -148,6 +149,16 @@ func run(logger *slog.Logger) error {
 		logger.Warn("KNULL_SECRET_KEY not set; storing integration credentials is disabled")
 	}
 	secretStore := secrets.NewStore(st.Pool, cipher)
+	approvalService := approval.NewService(st.Pool)
+	var productionExecutor *executor.Service
+	if cfg.ProductionExecutionEnabled {
+		client, err := executor.InCluster(cfg.ProductionCluster, cfg.ProductionNamespace, cfg.ProductionWorkload, cfg.ProductionCASHA256)
+		if err != nil {
+			return err
+		}
+		productionExecutor = &executor.Service{Gate: approvalService, Client: client, History: incidentStore}
+		logger.Info("production memory executor enabled", "cluster", cfg.ProductionCluster, "namespace", cfg.ProductionNamespace, "workload", cfg.ProductionWorkload)
+	}
 
 	var authn *auth.Authenticator
 	if cfg.OIDC.Configured() {
@@ -181,7 +192,8 @@ func run(logger *slog.Logger) error {
 			Collector:       collectorOrNil(collector),
 			Classifier:      classifier,
 			ActionPlanner:   actions.NewService(incidentStore, serviceStore),
-			Approvals:       approval.NewService(st.Pool),
+			Approvals:       approvalService,
+			Executor:        productionExecutor,
 			Sandbox:         sandboxService,
 			MemoryValidator: memoryValidator,
 			AlertIntake:     alertIntake,
