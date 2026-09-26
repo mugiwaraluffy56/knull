@@ -134,7 +134,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - The created record contains the initiating operator and supplied symptoms.
 - Invalid service/environment references are rejected before a workflow starts.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: e322087
+**Completion:** [x] Code pushed; verification passes. PR/commit: 3c6635d
 
 ### 7. Show fleet health and active incidents
 
