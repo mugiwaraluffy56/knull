@@ -16,6 +16,10 @@ type IncidentStore interface {
 	AppendEventID(context.Context, uuid.UUID, incidents.EventInput) (uuid.UUID, error)
 }
 
+type incidentTransitioner interface {
+	Transition(context.Context, uuid.UUID, incidents.Transition) (incidents.Incident, error)
+}
+
 type Service struct {
 	incidents IncidentStore
 	runner    *Runner
@@ -65,6 +69,25 @@ func (s *Service) Prepare(ctx context.Context, incidentID, actionEventID uuid.UU
 	}
 	if err := contract.Validate(); err != nil {
 		return RecordedRun{}, err
+	}
+	if contract.Type != actions.Memory {
+		// The current independent sandbox validator checks only the memory-limit
+		// scenario. A prepared workload is not validation, so do not imply that a
+		// scale, CPU, restart, or rollback proposal has passed its sandbox gate.
+		transitioner, ok := s.incidents.(incidentTransitioner)
+		if !ok {
+			return RecordedRun{}, fmt.Errorf("unsupported sandbox validation for %s; incident store cannot escalate", contract.Type)
+		}
+		_, transitionErr := transitioner.Transition(ctx, incidentID, incidents.Transition{
+			To:              incidents.StateEscalated,
+			Actor:           "sandbox",
+			Reason:          "sandbox validation is not implemented for " + string(contract.Type),
+			ExpectedVersion: inc.Version,
+		})
+		if transitionErr != nil {
+			return RecordedRun{}, fmt.Errorf("unsupported sandbox validation for %s; escalation failed: %w", contract.Type, transitionErr)
+		}
+		return RecordedRun{}, fmt.Errorf("unsupported sandbox validation for %s; incident escalated without production mutation", contract.Type)
 	}
 	run, runErr := s.runner.Run(ctx, contract, workload)
 	status := "sandbox prepared"

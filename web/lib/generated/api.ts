@@ -349,6 +349,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidents/{id}/plans/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correlate a crashing rollout and propose an exact pinned-image rollback
+         * @description Read-only evidence correlation and action proposal only. Does not validate, approve, or execute production rollback.
+         */
+        post: operations["proposeRollback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidents/{id}/sandbox-runs": {
         parameters: {
             query?: never;
@@ -595,6 +615,24 @@ export interface components {
             eventId: string;
             contract: components["schemas"]["ActionContract"];
             summary: string;
+        };
+        ProposedRollback: {
+            /** Format: uuid */
+            correlationEventId: string;
+            finding: {
+                currentImage: string;
+                previousImage: string;
+                currentDigest: string;
+                previousDigest: string;
+                container: string;
+                /** Format: uuid */
+                resourceUid: string;
+                resourceVersion: string;
+                commitSha: string;
+                commitUrl: string;
+                evidenceIds: string[];
+            };
+            action: components["schemas"]["CreatedActionPlan"];
         };
         HealthStatus: {
             /**
@@ -1561,6 +1599,70 @@ export interface operations {
                 content?: never;
             };
             /** @description Action planning unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proposeRollback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Correlation and sealed rollback proposal recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposedRollback"];
+                };
+            };
+            /** @description Invalid incident id. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident state or service mapping changed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Required rollout and GitHub evidence is unavailable or ambiguous. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rollback planning unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;

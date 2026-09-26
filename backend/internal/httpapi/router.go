@@ -48,6 +48,7 @@ type Options struct {
 	Collector         evidenceCollector
 	Classifier        incidentClassifier
 	ActionPlanner     actionPlanner
+	RollbackPlanner   rollbackPlanner
 	Approvals         approvalDecider
 	Executor          productionExecutor
 	Sandbox           sandboxPreparer
@@ -80,6 +81,7 @@ type Server struct {
 	collector         evidenceCollector
 	classifier        incidentClassifier
 	actionPlanner     actionPlanner
+	rollbackPlanner   rollbackPlanner
 	approvals         approvalDecider
 	executor          productionExecutor
 	sandbox           sandboxPreparer
@@ -119,6 +121,7 @@ func New(opts Options) *Server {
 		collector:         opts.Collector,
 		classifier:        opts.Classifier,
 		actionPlanner:     opts.ActionPlanner,
+		rollbackPlanner:   opts.RollbackPlanner,
 		approvals:         opts.Approvals,
 		executor:          opts.Executor,
 		sandbox:           opts.Sandbox,
@@ -168,6 +171,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/incidents/{id}/events", s.requireOperator(http.HandlerFunc(s.handleListIncidentEvents)))
 	mux.Handle("POST /api/incidents/{id}/collect", s.requireOperator(http.HandlerFunc(s.handleCollectEvidence)))
 	mux.Handle("POST /api/incidents/{id}/plans", s.requireOperator(http.HandlerFunc(s.handleCreateActionPlan)))
+	mux.Handle("POST /api/incidents/{id}/plans/rollback", s.requireOperator(http.HandlerFunc(s.handleProposeRollback)))
 	mux.Handle("POST /api/incidents/{id}/sandbox-runs", s.requireOperator(http.HandlerFunc(s.handlePrepareSandbox)))
 	mux.Handle("POST /api/incidents/{id}/validations/memory", s.requireOperator(http.HandlerFunc(s.handleValidateMemory)))
 	mux.Handle("POST /api/incidents/{id}/approvals", s.requireOperator(http.HandlerFunc(s.handleApproveAction)))

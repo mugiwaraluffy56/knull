@@ -549,6 +549,12 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Stale image state blocks execution and requires a fresh plan.
 - Recovery uses live workload and service signals.
 
+**Current implementation boundary:** The API can correlate a live pinned image,
+CrashLoopBackOff/BackOff evidence, and a matching GitHub image change into an
+exact digest-bound rollback proposal. Rollback-specific sandbox validation,
+approved image execution, and live recovery are not implemented; the proposal
+cannot be applied to production.
+
 **Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
 
 ### 27. Support the traffic-spike incident path
@@ -568,6 +574,15 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Unsupported or unvalidated actions are escalated without production mutation.
 - Approved scaling/resource changes target only the reviewed workload and values.
 - Recovery and non-recovery outcomes follow the configured policy.
+
+**Current implementation boundary:** The read-only collector records separate
+Prometheus observations for traffic rate, CPU saturation, 5xx rate, and p95
+latency, and the action contract supports bounded replica-count proposals. The
+independent candidate validator and production executor currently support only
+the memory-limit scenario. A non-memory proposal sent to sandbox preparation is
+therefore escalated and rejected before any production mutation. Task 27 remains
+incomplete until scale/resource validation, approved execution, and recovery
+verification are implemented and exercised with live integrations.
 
 **Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
 

@@ -508,6 +508,26 @@ paths:
           description: Incident not found.
         "503":
           description: Action planning unavailable.
+  /api/incidents/{id}/plans/rollback:
+    post:
+      operationId: proposeRollback
+      summary: Correlate a crashing rollout and propose an exact pinned-image rollback
+      description: Read-only evidence correlation and action proposal only. Does not validate, approve, or execute production rollback.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      responses:
+        "201":
+          description: Correlation and sealed rollback proposal recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposedRollback"
+        "400": { description: Invalid incident id. }
+        "401": { description: Authentication required. }
+        "404": { description: Incident not found. }
+        "409": { description: Incident state or service mapping changed. }
+        "422": { description: Required rollout and GitHub evidence is unavailable or ambiguous. }
+        "503": { description: Rollback planning unavailable. }
   /api/incidents/{id}/sandbox-runs:
     post:
       operationId: prepareSandboxRun
@@ -831,6 +851,28 @@ components:
         eventId: { type: string, format: uuid }
         contract: { $ref: "#/components/schemas/ActionContract" }
         summary: { type: string }
+    ProposedRollback:
+      type: object
+      required: [correlationEventId, finding, action]
+      properties:
+        correlationEventId: { type: string, format: uuid }
+        finding:
+          type: object
+          required: [currentImage, previousImage, currentDigest, previousDigest, container, resourceUid, resourceVersion, commitSha, commitUrl, evidenceIds]
+          properties:
+            currentImage: { type: string }
+            previousImage: { type: string }
+            currentDigest: { type: string }
+            previousDigest: { type: string }
+            container: { type: string }
+            resourceUid: { type: string, format: uuid }
+            resourceVersion: { type: string }
+            commitSha: { type: string }
+            commitUrl: { type: string }
+            evidenceIds:
+              type: array
+              items: { type: string, format: uuid }
+        action: { $ref: "#/components/schemas/CreatedActionPlan" }
     HealthStatus:
       type: object
       required:

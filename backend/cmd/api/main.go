@@ -20,6 +20,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/alerts"
 	"github.com/mugiwaraluffy56/knull/backend/internal/approval"
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
+	"github.com/mugiwaraluffy56/knull/backend/internal/baddeployment"
 	"github.com/mugiwaraluffy56/knull/backend/internal/classify"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/executor"
@@ -220,6 +221,7 @@ func run(logger *slog.Logger) error {
 			Collector:         collectorOrNil(collector),
 			Classifier:        classifier,
 			ActionPlanner:     actions.NewService(incidentStore, serviceStore),
+			RollbackPlanner:   baddeployment.NewService(incidentStore, serviceStore, actions.NewService(incidentStore, serviceStore)),
 			Approvals:         approvalService,
 			Executor:          productionExecutor,
 			Sandbox:           sandboxService,
