@@ -278,6 +278,27 @@ func (s *Store) List(ctx context.Context) ([]Incident, error) {
 	return out, rows.Err()
 }
 
+// ListActive returns all incidents that are not closed, most recently updated
+// first. Used to compute fleet health.
+func (s *Store) ListActive(ctx context.Context) ([]Incident, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+incidentColumns+`
+		FROM incidents WHERE state <> $1 ORDER BY updated_at DESC`, string(StateClosed))
+	if err != nil {
+		return nil, fmt.Errorf("list active incidents: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Incident
+	for rows.Next() {
+		var inc Incident
+		if err := rows.Scan(incidentTargets(&inc)...); err != nil {
+			return nil, fmt.Errorf("scan incident: %w", err)
+		}
+		out = append(out, inc)
+	}
+	return out, rows.Err()
+}
+
 // Events returns an incident's full history in order.
 func (s *Store) Events(ctx context.Context, id uuid.UUID) ([]Event, error) {
 	rows, err := s.pool.Query(ctx, `

@@ -275,6 +275,29 @@ paths:
           description: Malformed payload.
         "401":
           description: Invalid or missing secret.
+  /api/fleet:
+    get:
+      operationId: getFleet
+      summary: Fleet health and active incidents
+      responses:
+        "200":
+          description: Fleet rows, services with active incidents first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fleet]
+                properties:
+                  fleet:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FleetRow"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/incidents:
     get:
       operationId: listIncidents
@@ -589,6 +612,36 @@ components:
         closedAt:
           type: string
           format: date-time
+    FleetRow:
+      type: object
+      required: [key, displayName, environment, enabled, status, activeIncidentCount, signalsAvailable]
+      properties:
+        serviceId:
+          type: string
+        key:
+          type: string
+        displayName:
+          type: string
+        environment:
+          type: string
+        enabled:
+          type: boolean
+        status:
+          type: string
+          enum: [HEALTHY, INVESTIGATING, AWAITING_APPROVAL, REMEDIATING, VERIFYING, INCIDENT]
+        activeIncidentCount:
+          type: integer
+        latestIncident:
+          type: object
+          properties:
+            id:
+              type: string
+            state:
+              $ref: "#/components/schemas/IncidentState"
+            summary:
+              type: string
+        signalsAvailable:
+          type: boolean
     IncidentEvent:
       type: object
       required: [id, incidentId, seq, type, actor, createdAt]

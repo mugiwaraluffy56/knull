@@ -30,40 +30,42 @@ type secretStore interface {
 
 // Options bundles the dependencies used to build a Server.
 type Options struct {
-	Deps          dependencyChecker
-	AllowedOrigin string
-	HealthTimeout time.Duration
-	Sessions      *auth.SessionManager
-	Authn         *auth.Authenticator // nil when OIDC is not configured/reachable
-	Operators     operatorStore
-	Secrets       secretStore
-	Services      serviceStore
-	Incidents     incidentStore
-	AlertIntake   alertIntake
-	AlertFailures failureRecorder
-	AlertSecret   string
-	AppBaseURL    string
-	UIBaseURL     string
-	Logger        *slog.Logger
+	Deps           dependencyChecker
+	AllowedOrigin  string
+	HealthTimeout  time.Duration
+	Sessions       *auth.SessionManager
+	Authn          *auth.Authenticator // nil when OIDC is not configured/reachable
+	Operators      operatorStore
+	Secrets        secretStore
+	Services       serviceStore
+	Incidents      incidentStore
+	FleetIncidents fleetIncidentSource
+	AlertIntake    alertIntake
+	AlertFailures  failureRecorder
+	AlertSecret    string
+	AppBaseURL     string
+	UIBaseURL      string
+	Logger         *slog.Logger
 }
 
 // Server holds the dependencies needed to serve HTTP requests.
 type Server struct {
-	deps          dependencyChecker
-	allowedOrigin string
-	healthTimeout time.Duration
-	sessions      *auth.SessionManager
-	authn         *auth.Authenticator
-	operators     operatorStore
-	secrets       secretStore
-	services      serviceStore
-	incidents     incidentStore
-	alertIntake   alertIntake
-	alertFailures failureRecorder
-	alertSecret   string
-	appBaseURL    string
-	uiBaseURL     string
-	logger        *slog.Logger
+	deps           dependencyChecker
+	allowedOrigin  string
+	healthTimeout  time.Duration
+	sessions       *auth.SessionManager
+	authn          *auth.Authenticator
+	operators      operatorStore
+	secrets        secretStore
+	services       serviceStore
+	incidents      incidentStore
+	fleetIncidents fleetIncidentSource
+	alertIntake    alertIntake
+	alertFailures  failureRecorder
+	alertSecret    string
+	appBaseURL     string
+	uiBaseURL      string
+	logger         *slog.Logger
 }
 
 // New builds a Server from Options, applying safe defaults.
@@ -75,21 +77,22 @@ func New(opts Options) *Server {
 		opts.Logger = slog.Default()
 	}
 	return &Server{
-		deps:          opts.Deps,
-		allowedOrigin: opts.AllowedOrigin,
-		healthTimeout: opts.HealthTimeout,
-		sessions:      opts.Sessions,
-		authn:         opts.Authn,
-		operators:     opts.Operators,
-		secrets:       opts.Secrets,
-		services:      opts.Services,
-		incidents:     opts.Incidents,
-		alertIntake:   opts.AlertIntake,
-		alertFailures: opts.AlertFailures,
-		alertSecret:   opts.AlertSecret,
-		appBaseURL:    opts.AppBaseURL,
-		uiBaseURL:     opts.UIBaseURL,
-		logger:        opts.Logger,
+		deps:           opts.Deps,
+		allowedOrigin:  opts.AllowedOrigin,
+		healthTimeout:  opts.HealthTimeout,
+		sessions:       opts.Sessions,
+		authn:          opts.Authn,
+		operators:      opts.Operators,
+		secrets:        opts.Secrets,
+		services:       opts.Services,
+		incidents:      opts.Incidents,
+		fleetIncidents: opts.FleetIncidents,
+		alertIntake:    opts.AlertIntake,
+		alertFailures:  opts.AlertFailures,
+		alertSecret:    opts.AlertSecret,
+		appBaseURL:     opts.AppBaseURL,
+		uiBaseURL:      opts.UIBaseURL,
+		logger:         opts.Logger,
 	}
 }
 
@@ -118,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PUT /api/services/{id}", s.requireOperator(http.HandlerFunc(s.handleUpdateService)))
 	mux.Handle("PATCH /api/services/{id}/enabled", s.requireOperator(http.HandlerFunc(s.handleSetServiceEnabled)))
 
+	mux.Handle("GET /api/fleet", s.requireOperator(http.HandlerFunc(s.handleFleet)))
 	mux.Handle("GET /api/incidents", s.requireOperator(http.HandlerFunc(s.handleListIncidents)))
 	mux.Handle("POST /api/incidents", s.requireOperator(http.HandlerFunc(s.handleStartInvestigation)))
 	mux.Handle("GET /api/incidents/{id}", s.requireOperator(http.HandlerFunc(s.handleGetIncident)))

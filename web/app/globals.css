@@ -313,3 +313,54 @@ code {
   min-height: 60px;
   font-family: inherit;
 }
+
+/* Status badges */
+.status {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.status-HEALTHY { background: rgba(46,204,113,0.15); color: var(--ok); }
+.status-INVESTIGATING { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.status-AWAITING_APPROVAL { background: rgba(245,158,11,0.18); color: #fbbf24; }
+.status-REMEDIATING { background: rgba(168,85,247,0.18); color: #c084fc; }
+.status-VERIFYING { background: rgba(20,184,166,0.18); color: #2dd4bf; }
+.status-INCIDENT { background: rgba(231,76,60,0.15); color: var(--bad); }
+.row-incident { background: rgba(231,76,60,0.05); }
+
+/* Incident detail */
+.incident-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-title {
+  font-size: 15px;
+  margin: 22px 0 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.timeline {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.timeline-item {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.timeline-seq { color: var(--muted); font-size: 12px; }
+.timeline-actor { color: var(--muted); }
+.timeline-time { color: var(--muted); font-size: 12px; white-space: nowrap; }

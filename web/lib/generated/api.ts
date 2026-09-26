@@ -201,6 +201,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fleet health and active incidents */
+        get: operations["getFleet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidents": {
         parameters: {
             query?: never;
@@ -368,6 +385,22 @@ export interface components {
             updatedAt: string;
             /** Format: date-time */
             closedAt?: string;
+        };
+        FleetRow: {
+            serviceId?: string;
+            key: string;
+            displayName: string;
+            environment: string;
+            enabled: boolean;
+            /** @enum {string} */
+            status: "HEALTHY" | "INVESTIGATING" | "AWAITING_APPROVAL" | "REMEDIATING" | "VERIFYING" | "INCIDENT";
+            activeIncidentCount: number;
+            latestIncident?: {
+                id?: string;
+                state?: components["schemas"]["IncidentState"];
+                summary?: string;
+            };
+            signalsAvailable: boolean;
         };
         IncidentEvent: {
             /** Format: uuid */
@@ -802,6 +835,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getFleet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fleet rows, services with active incidents first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        fleet: components["schemas"]["FleetRow"][];
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };

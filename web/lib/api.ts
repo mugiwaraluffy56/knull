@@ -116,6 +116,24 @@ export function loginURL(): string {
   return `${API_BASE_URL}/api/auth/login`;
 }
 
+export type FleetRow = components["schemas"]["FleetRow"];
+
+export interface FleetResult {
+  authenticated: boolean;
+  fleet: FleetRow[];
+}
+
+// fetchFleet returns the fleet view. authenticated=false prompts sign-in.
+export async function fetchFleet(): Promise<FleetResult> {
+  const res = await fetch(`${API_BASE_URL}/api/fleet`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (res.status === 401) return { authenticated: false, fleet: [] };
+  const body = (await res.json()) as { fleet: FleetRow[] };
+  return { authenticated: true, fleet: body.fleet ?? [] };
+}
+
 export type Service = components["schemas"]["Service"];
 export type ServiceInput = components["schemas"]["ServiceInput"];
 
@@ -194,6 +212,28 @@ export async function setServiceEnabled(
 }
 
 export type Incident = components["schemas"]["Incident"];
+export type IncidentEvent = components["schemas"]["IncidentEvent"];
+
+// fetchIncident returns one incident, or null when not found / unauthenticated.
+export async function fetchIncident(id: string): Promise<Incident | null> {
+  const res = await fetch(`${API_BASE_URL}/api/incidents/${id}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as Incident;
+}
+
+// fetchIncidentEvents returns an incident's ordered audit history.
+export async function fetchIncidentEvents(id: string): Promise<IncidentEvent[]> {
+  const res = await fetch(`${API_BASE_URL}/api/incidents/${id}/events`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const body = (await res.json()) as { events: IncidentEvent[] };
+  return body.events ?? [];
+}
 
 export interface StartInvestigationResult {
   ok: boolean;
