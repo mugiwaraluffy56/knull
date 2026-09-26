@@ -16,7 +16,7 @@ export default function RootLayout({
       <body>
         <header className="topbar">
           <nav className="topbar-nav">
-            <Link href="/" className="brand" aria-label="Knull home"><span className="brand-mark" aria-hidden="true">✳</span>Knull</Link>
+            <Link href="/" className="brand" aria-label="Knull home"><span className="brand-mark" aria-hidden="true" />Knull</Link>
             <Link href="/fleet" className="navlink">
               Fleet
             </Link>

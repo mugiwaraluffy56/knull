@@ -564,7 +564,7 @@ a { color: inherit; }
 .topbar { height: 68px; padding: 0 clamp(22px,4vw,64px); position: sticky; top: 0; z-index: 20; background: rgba(8,8,9,.92); backdrop-filter: blur(18px); border-bottom-color: rgba(255,255,255,.08); }
 .topbar-nav { gap: clamp(14px,2.3vw,34px); }
 .brand { display: inline-flex; align-items: center; gap: 12px; margin-right: clamp(16px,3vw,46px); font-size: 21px; font-weight: 700; letter-spacing: 0; }
-.brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border: 1.5px solid #fff; border-radius: 9px; font-size: 20px; line-height: 1; }
+.brand-mark { display: block; flex: 0 0 30px; width: 30px; height: 30px; background: url('/knull-skull.png') -31.2px -29.5px / 92.3px 92.3px no-repeat; mix-blend-mode: screen; image-rendering: pixelated; }
 .navlink { color: #aaa; font-size: 13px; font-weight: 500; text-decoration: none; transition: color .15s ease; }
 .navlink:hover { color: #fff; }
 .auth-signed { font-size: 13px; }
