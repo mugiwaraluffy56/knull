@@ -244,6 +244,18 @@ An adapter provisions or selects an isolated test environment, applies only the 
 
 ## 11. Architecture and component responsibilities
 
+### Technology stack
+
+- **Frontend:** TypeScript, React, and Next.js App Router. Use the Node.js 24 LTS runtime for the web application.
+- **Backend:** Go service using the standard `net/http` package for the incident API, service configuration, approval policy, execution, and recovery APIs.
+- **Workflow runtime:** TrueForge, called by the Go backend through its language-neutral HTTP and Server-Sent Events API. The TypeScript SDK is not required by the backend.
+- **MCP:** Reuse the existing Kubernetes, Prometheus, and GitHub MCP servers. Implement `jev-mcp` in Go with the official MCP Go SDK.
+- **Persistence:** PostgreSQL for application service configuration, incident projections, decisions, approvals, and audit events. Redis supports the shared, multi-replica TrueForge deployment.
+- **Deployment:** containerized services deployed to Kubernetes.
+- **Gateways:** TrueFoundry MCP Gateway and AI Gateway remain optional integrations as described below.
+
+The frontend and backend communicate through a versioned HTTP API described by an OpenAPI contract; generate or validate the TypeScript client from that contract. Keep the Go services in one deployable backend initially, with Jev MCP as a separate process because it has its own MCP server contract.
+
 ```text
 Alert source ──> Incident API ──> Durable workflow (TrueForge)
                                       │
@@ -267,15 +279,15 @@ Alert source ──> Incident API ──> Durable workflow (TrueForge)
 ```
 
 - **Next.js GUI:** fleet, incident, timeline, approval, and recovery views. It does not contain privileged integration credentials.
-- **Incident API/backend:** intake, service mapping, incident/event persistence, state transition validation, and UI data access.
-- **TrueForge workflow:** durable orchestration, tool scheduling, context, pause/resume, subagents, sandbox invocation, and execution trace.
-- **MCP adapters:** provider-specific read and write tools. Keep read and mutation permissions distinguishable.
-- **Jev MCP:** typed classification, next-action, risk, and recovery decisions.
+- **Go incident API/backend:** intake, service mapping, incident/event persistence, state transition validation, approval policy, production execution, recovery verification, and UI data access.
+- **TrueForge workflow:** durable orchestration, tool scheduling, context, pause/resume, subagents, sandbox invocation, and execution trace. The backend drives it through HTTP/SSE.
+- **MCP adapters:** provider-specific read and write tools. Reuse external Kubernetes, Prometheus, and GitHub servers; keep read and mutation permissions distinguishable.
+- **Jev MCP:** a Go MCP server for typed classification, next-action, risk, and recovery decisions.
 - **Policy/approval service:** enforces action allowlist, exact-action approval, approval freshness, and state preconditions.
 - **Sandbox adapter:** isolates validation from production and returns reproducible results.
 - **Production executor:** performs approved mutations and reconciles provider outcomes.
 - **Recovery verifier:** queries live signals and emits a typed recovery assessment.
-- **State:** SQLite is the proposed MVP persistence technology. Separate immutable events from current-state projections.
+- **State:** PostgreSQL stores application data and the append-only incident event history; current UI state may use projections. Redis supports TrueForge's shared multi-replica runtime.
 
 TrueFoundry MCP Gateway may centralize MCP integrations, credentials, authentication, and error handling where available. TrueFoundry AI Gateway is optional and may provide budgets, rate limits, and traces.
 
@@ -384,7 +396,6 @@ Example metric values in the PRD (including 97% confidence and specific before/a
 - What is the event and raw-log retention policy, and which fields require redaction?
 - Which exact Kubernetes MCP server and operations are available in the target environment?
 - What are the deployment SLOs for latency, availability, throughput, and cost?
-- Is SQLite sufficient for the target concurrency and durability requirements, or should the persistence layer change before a multi-user deployment?
 
 ## 19. References
 
