@@ -260,7 +260,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Missing repositories or permissions are shown as unavailable evidence.
 - The agent never receives GitHub write capability through this integration.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; verification passes. PR/commit: 647569d (live GitHub App + MCP server verify pending)
 
 ### 13. Implement the Jev MCP server in Go
 
