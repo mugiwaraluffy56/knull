@@ -242,6 +242,7 @@ export async function setServiceEnabled(
 export type Incident = components["schemas"]["Incident"];
 export type IncidentEvent = components["schemas"]["IncidentEvent"];
 export type ActionContract = components["schemas"]["ActionContract"];
+export type ActionDraft = components["schemas"]["ActionDraft"];
 export type ActionDecision = components["schemas"]["ActionDecision"];
 export type MemoryValidationResult = components["schemas"]["MemoryValidationResult"];
 
@@ -312,6 +313,29 @@ export async function collectEvidence(id: string): Promise<string | null> {
   } catch {
     return `request failed (${res.status})`;
   }
+}
+
+export async function createActionPlan(incidentId: string, draft: ActionDraft): Promise<{ eventId?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/plans`, {
+      method: "POST", credentials: "include", cache: "no-store",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft),
+    });
+    if (res.ok) return { eventId: ((await res.json()) as { eventId: string }).eventId };
+    const body = (await res.json()) as { error?: string };
+    return { error: body.error ?? `request failed (${res.status})` };
+  } catch (err) { return { error: err instanceof Error ? err.message : "request failed" }; }
+}
+
+export async function validateMemoryAction(incidentId: string, actionEventId: string, workload: components["schemas"]["SandboxWorkload"]): Promise<{ result?: MemoryValidationResult; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/validations/memory`, {
+      method: "POST", credentials: "include", cache: "no-store",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actionEventId, workload }),
+    });
+    const body = await res.json() as MemoryValidationResult | { result?: MemoryValidationResult; error?: string };
+    return res.ok ? { result: body as MemoryValidationResult } : { result: (body as { result?: MemoryValidationResult }).result, error: (body as { error?: string }).error ?? `request failed (${res.status})` };
+  } catch (err) { return { error: err instanceof Error ? err.message : "request failed" }; }
 }
 
 // fetchIncidentEvents returns an incident's ordered audit history.

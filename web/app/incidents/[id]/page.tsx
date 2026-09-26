@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ApprovalReview from "./ApprovalReview";
+import LiveActionFlow from "./LiveActionFlow";
 import {
   collectEvidence,
   fetchIncident,
@@ -121,6 +122,7 @@ export default function IncidentPage({
           {collectMsg && <span className="auth-muted"> {collectMsg}</span>}
         </div>
 
+		<LiveActionFlow incident={incident} events={events} onRefresh={load} />
         <ApprovalReview incident={incident} events={events} onRefresh={load} />
 		{incident.state !== "CLOSED" && <section className="incident-resolution" aria-label="Incident resolution">
 			<h2>Resolution</h2>
