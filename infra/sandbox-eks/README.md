@@ -112,6 +112,10 @@ runner. The runner requires its own kubeconfig with only the sandbox context,
 plus the sandbox cluster's `kube-system` namespace UID and an explicit list
 of production cluster UIDs. See `backend/.env.example`.
 
-The `checkout-fixture` image must be pushed to a pull-only registry and
-referenced by digest. TrueForge's code sandbox and sandbox-local Prometheus
-must be configured separately; creating EKS alone does not complete Task 18.
+The `checkout-fixture` and Python code-executor images must be pushed to a
+pull-only registry and referenced by digest. For the live Mumbai run, the
+code-executor image is
+`079485644745.dkr.ecr.ap-south-1.amazonaws.com/knull/code-executor@sha256:dc0cd08f3977bb01b3c833e60605cdd846aa676b4f1b2f9a82db8cdff353feb4`.
+TrueForge authors validation code; the runner executes it as a restricted Job
+inside the isolated EKS run namespace. No Daytona provider is required.
+Sandbox-local Prometheus must be configured to complete Task 18.
