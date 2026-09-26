@@ -16,6 +16,8 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
 // repoPattern matches an owner/repo GitHub reference.
 var repoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
+var refPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
+
 // Service is a configured product identity in one environment.
 type Service struct {
 	ID                uuid.UUID         `json:"id"`
@@ -105,6 +107,9 @@ func normalizeAndValidate(in Input) (Input, error) {
 	}
 	if out.GitHubRepo != "" && !repoPattern.MatchString(out.GitHubRepo) {
 		fields["githubRepo"] = "must be in owner/repo form"
+	}
+	if out.GitHubRepo != "" && !refPattern.MatchString(out.GitHubRef) {
+		fields["githubRef"] = "required with a GitHub repository; use an explicit branch or tag"
 	}
 	for k, v := range out.PrometheusLabels {
 		if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {

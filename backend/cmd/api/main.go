@@ -97,9 +97,18 @@ func run(logger *slog.Logger) error {
 	} else {
 		logger.Warn("KNULL_PROMETHEUS_MCP_URL not set; prometheus investigation is disabled")
 	}
+	var githubInvestigator *investigate.GitHubInvestigator
+	if cfg.GitHubMCPURL != "" {
+		githubClient := mcp.NewClient(mcp.NewHTTPTransport(cfg.GitHubMCPURL, cfg.GitHubMCPToken))
+		githubInvestigator = investigate.NewGitHubInvestigator(githubClient)
+		logger.Info("github mcp investigation enabled", "url", cfg.GitHubMCPURL)
+	} else {
+		logger.Warn("KNULL_GITHUB_MCP_URL not set; github investigation is disabled")
+	}
 	var collector *investigate.Collector
-	if k8sInvestigator != nil || prometheusInvestigator != nil {
+	if k8sInvestigator != nil || prometheusInvestigator != nil || githubInvestigator != nil {
 		collector = investigate.NewCollector(incidentStore, serviceStore, k8sInvestigator, prometheusInvestigator)
+		collector.WithGitHub(githubInvestigator)
 	}
 
 	var cipher *secrets.Cipher

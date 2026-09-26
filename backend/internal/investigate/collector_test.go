@@ -81,6 +81,30 @@ func TestCollectorRunsPrometheusWhenKubernetesIsNotConfigured(t *testing.T) {
 	}
 }
 
+func TestCollectorRunsGitHubWhenOtherInvestigatorsAreNotConfigured(t *testing.T) {
+	svcID := uuid.New()
+	svc := services.Service{
+		ID: svcID, Key: "checkout-api", Environment: "production",
+		GitHubRepo: "acme/checkout", GitHubRef: "production",
+	}
+	inc := incidents.Incident{ID: uuid.New(), ServiceID: &svcID, ServiceKey: "checkout-api", Environment: "production"}
+	incStore := &fakeIncidentStore{inc: inc}
+	client := &githubFake{results: map[string]string{
+		"list_commits":         `[]`,
+		"search_pull_requests": `{"items":[]}`,
+	}}
+	col := NewCollector(incStore, &fakeServiceStore{svc: svc}, nil).WithGitHub(NewGitHubInvestigator(client))
+	if !col.Enabled() {
+		t.Fatal("collector should be enabled with a GitHub investigator")
+	}
+	if err := col.Collect(context.Background(), inc.ID); err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if len(client.calls) != 2 || len(incStore.events) != 2 {
+		t.Fatalf("calls=%d events=%d, want two queries and two findings", len(client.calls), len(incStore.events))
+	}
+}
+
 func TestCollectorErrorsWhenNoServiceMapping(t *testing.T) {
 	inc := incidents.Incident{ID: uuid.New()} // ServiceID nil
 	col := NewCollector(&fakeIncidentStore{inc: inc}, &fakeServiceStore{}, NewKubernetesInvestigator(&fakeCaller{}))

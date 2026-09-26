@@ -133,6 +133,7 @@ export default function IncidentPage({
                   )}
                   <span className="timeline-actor"> · {e.actor || "system"}</span>
                   {e.source === "prometheus" && <PrometheusFinding event={e} />}
+                  {e.source === "github" && <GitHubFinding event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -169,6 +170,37 @@ function PrometheusFinding({ event }: { event: IncidentEvent }) {
         <span> · {window.start} to {window.end} ({window.step})</span>
       )}
       {query && <code className="metric-query">{query}</code>}
+    </div>
+  );
+}
+
+function GitHubFinding({ event }: { event: IncidentEvent }) {
+  const data = event.data;
+  if (!data || data.available === false) return null;
+  const url = typeof data.url === "string" ? data.url : "";
+  const message = typeof data.message === "string" ? data.message : "";
+  const files = Array.isArray(data.files) ? data.files : [];
+  const pullRequests = Array.isArray(data.pullRequests) ? data.pullRequests : [];
+
+  return (
+    <div className="metric-finding">
+      {url && <a href={url} target="_blank" rel="noopener noreferrer">View commit</a>}
+      {message && <span> · {message}</span>}
+      {files.map((item, index) => {
+        const file = item as { path?: string; relevantLines?: string[] };
+        return (
+          <div key={index}>
+            {file.path}
+            {Array.isArray(file.relevantLines) && file.relevantLines.length > 0 && (
+              <code className="metric-query">{file.relevantLines.join("\n")}</code>
+            )}
+          </div>
+        );
+      })}
+      {pullRequests.map((item, index) => {
+        const pr = item as { number?: number; title?: string; url?: string };
+        return <div key={index}>PR #{pr.number}: <a href={pr.url} target="_blank" rel="noopener noreferrer">{pr.title}</a></div>;
+      })}
     </div>
   );
 }

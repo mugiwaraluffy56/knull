@@ -213,6 +213,18 @@ and `http_request_duration_seconds_bucket` metrics; absent series appear as
 unavailable in the timeline. Production metric names that differ from these
 templates need a configured query mapping before the full incident demo.
 
+**GitHub findings:** connect the [official GitHub MCP server v1.12.2](https://github.com/github/github-mcp-server/releases/tag/v1.12.2)
+at `KNULL_GITHUB_MCP_URL`, with `KNULL_GITHUB_MCP_TOKEN` set to a customer GitHub
+App installation token. Give that App read-only contents, metadata, and pull
+request access only to mapped repositories. Configure the MCP server with
+`GITHUB_READ_ONLY=1` and
+`GITHUB_TOOLS=list_commits,get_commit,search_pull_requests`. Configure each service's
+`githubRepo` as `owner/repo` and its `githubRef` as the environment's explicit
+branch or tag. The investigator reads up to five recent commits and recent
+merged PRs, showing manifest resource changes and source links in the incident
+timeline. Its finding identifies a possible deployment correlation; it does
+not by itself prove the cause of an incident.
+
 Run all checks the way CI does:
 
 ```bash

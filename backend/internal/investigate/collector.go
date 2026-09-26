@@ -29,6 +29,13 @@ type Collector struct {
 	services   ServiceStore
 	k8s        *KubernetesInvestigator
 	prometheus *PrometheusInvestigator
+	github     *GitHubInvestigator
+}
+
+// WithGitHub connects read-only source control investigation.
+func (c *Collector) WithGitHub(g *GitHubInvestigator) *Collector {
+	c.github = g
+	return c
 }
 
 // NewCollector builds a Collector with the connected investigators. The
@@ -43,7 +50,7 @@ func NewCollector(inc IncidentStore, svc ServiceStore, k8s *KubernetesInvestigat
 
 // Enabled reports whether at least one investigator is connected.
 func (c *Collector) Enabled() bool {
-	return c.k8s != nil || c.prometheus != nil
+	return c.k8s != nil || c.prometheus != nil || c.github != nil
 }
 
 // Collect resolves the incident's service mapping and runs every connected
@@ -69,6 +76,9 @@ func (c *Collector) Collect(ctx context.Context, incidentID uuid.UUID) error {
 	}
 	if c.prometheus != nil {
 		_ = c.prometheus.Inspect(ctx, c.incidents, incidentID, t)
+	}
+	if c.github != nil {
+		_ = c.github.Inspect(ctx, c.incidents, incidentID, t)
 	}
 	return nil
 }
