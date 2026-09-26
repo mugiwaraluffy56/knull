@@ -94,7 +94,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Restarting the backend preserves incidents, state, and event history.
 - Concurrent state changes cannot silently overwrite an approval or execution transition.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: 9066763
+**Completion:** [x] Code pushed; verification passes. PR/commit: e32aef2
 
 ### 5. Receive and deduplicate alerts
 
