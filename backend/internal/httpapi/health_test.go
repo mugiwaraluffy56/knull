@@ -10,7 +10,11 @@ import (
 )
 
 func newTestServer(pgErr, redisErr error) *Server {
-	return New(staticChecker{postgresErr: pgErr, redisErr: redisErr}, "http://localhost:3000", time.Second)
+	return New(Options{
+		Deps:          staticChecker{postgresErr: pgErr, redisErr: redisErr},
+		AllowedOrigin: "http://localhost:3000",
+		HealthTimeout: time.Second,
+	})
 }
 
 func TestHandleLiveAlwaysOK(t *testing.T) {

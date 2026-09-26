@@ -40,6 +40,9 @@ dev: ## Print how to run both dev servers
 dev-api: ## Run the Go incident API (requires 'make up')
 	cd backend && go run ./cmd/api
 
+migrate: ## Apply database migrations
+	cd backend && go run ./cmd/migrate
+
 dev-web: ## Run the Next.js UI
 	cd web && pnpm dev
 

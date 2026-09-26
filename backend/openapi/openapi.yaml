@@ -43,6 +43,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /api/auth/login:
+    get:
+      operationId: login
+      summary: Begin operator sign-in
+      description: Redirects the browser to the configured OIDC provider.
+      responses:
+        "302":
+          description: Redirect to the identity provider.
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: Sign out
+      description: Revokes the current session and clears the cookie.
+      responses:
+        "204":
+          description: Signed out.
+  /api/me:
+    get:
+      operationId: getMe
+      summary: Current operator identity
+      responses:
+        "200":
+          description: The signed-in operator.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operator"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/integrations/credentials:
+    get:
+      operationId: listCredentials
+      summary: List integration credential metadata
+      description: Returns metadata only; secret values are never included.
+      responses:
+        "200":
+          description: Stored credential metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [credentials]
+                properties:
+                  credentials:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CredentialMetadata"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: putCredential
+      summary: Store or replace an integration credential
+      description: >
+        Accepts a write-only secret value, encrypts it at rest, and returns
+        metadata only. The value is never returned by any endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutCredentialRequest"
+      responses:
+        "200":
+          description: Stored credential metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialMetadata"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     HealthStatus:
@@ -65,3 +153,65 @@ components:
           type: string
           format: date-time
           description: RFC 3339 timestamp when the check ran.
+    Operator:
+      type: object
+      required: [id, email, name, createdAt, lastLogin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type: string
+          format: date-time
+    CredentialMetadata:
+      type: object
+      required: [id, kind, scope, fingerprint, createdBy, createdAt, updatedAt]
+      description: Metadata about a stored credential. Never contains the value.
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [kubernetes, prometheus, github, openai]
+        scope:
+          type: string
+          enum: [read, sandbox, production]
+        fingerprint:
+          type: string
+          description: Non-reversible identifier of the secret value.
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PutCredentialRequest:
+      type: object
+      required: [kind, scope, value]
+      properties:
+        kind:
+          type: string
+          enum: [kubernetes, prometheus, github, openai]
+        scope:
+          type: string
+          enum: [read, sandbox, production]
+        value:
+          type: string
+          description: Write-only secret value; never returned by any endpoint.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -176,15 +176,23 @@ Docker with Compose.
 
 ```bash
 make deps          # install backend and frontend dependencies
-make up            # start PostgreSQL and Redis, wait until healthy
+make up            # start PostgreSQL, Redis, and Keycloak, wait until healthy
+export KNULL_SECRET_KEY=$(openssl rand -base64 32)   # enables credential storage
 make dev-api       # terminal 1: Go incident API on http://localhost:8080
 make dev-web       # terminal 2: Next.js UI on http://localhost:3000
 ```
 
-Open the UI: the home page is a health page that calls the backend and shows
-whether the API, PostgreSQL, and Redis are reachable. Backend health endpoints
-are `GET /healthz` (liveness) and `GET /readyz` (readiness with dependency
-detail).
+Open the UI: the home page is a health page that shows whether the API,
+PostgreSQL, and Redis are reachable. Backend health endpoints are
+`GET /healthz` (liveness) and `GET /readyz` (readiness with dependency detail).
+
+**Sign in:** operator identity uses OpenID Connect. Compose runs a disposable
+Keycloak realm on http://localhost:8081 with a test operator
+(`operator` / `operator`). Click **Sign in**, authenticate, and the
+**Integrations** page lets you store integration credentials. Credentials are
+encrypted at rest with AES-256-GCM; values are write-only and never returned by
+the API — only a non-reversible fingerprint is shown. Set `KNULL_SECRET_KEY`
+(any 32-byte key) to enable credential storage.
 
 Run all checks the way CI does:
 
@@ -203,7 +211,8 @@ docs/SPEC.md        Detailed product and architecture specification.
 docs/IMPLEMENT.md   Dependency-ordered implementation checklist.
 backend/            Go incident API (net/http), migrations, OpenAPI contract.
 web/                Next.js App Router UI (TypeScript, React).
-docker-compose.yml  Local PostgreSQL and Redis.
+infra/keycloak/     Disposable OIDC realm imported for local development.
+docker-compose.yml  Local PostgreSQL, Redis, and Keycloak.
 Makefile            Developer workflow entry points (make help).
 README.md           This file.
 ```

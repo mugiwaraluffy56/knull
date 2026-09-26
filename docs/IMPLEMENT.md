@@ -53,7 +53,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Secret values never appear in API responses, logs, or event history.
 - Sandbox and production credentials cannot be used interchangeably.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; verification passes. PR/commit: a8cf77d
 
 ### 3. Build service and environment configuration
 

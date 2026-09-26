@@ -27,6 +27,37 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	// HealthTimeout bounds each dependency health probe.
 	HealthTimeout time.Duration
+
+	// OIDC holds operator sign-in settings. When OIDC.Issuer is empty, auth is
+	// unconfigured and protected endpoints reject every request.
+	OIDC OIDCConfig
+	// SessionTTL bounds how long an operator session stays valid.
+	SessionTTL time.Duration
+	// CookieSecure marks session cookies Secure; disable only for local http.
+	CookieSecure bool
+	// AppBaseURL is the browser-facing base URL of this backend, used to build
+	// the OIDC redirect URL and to redirect back to the UI after login.
+	AppBaseURL string
+	// UIBaseURL is where operators are sent after a successful login.
+	UIBaseURL string
+	// SecretKey is the 32-byte AES-256 key (base64 or hex) used to encrypt
+	// stored integration credentials at rest. Required to store credentials.
+	SecretKey string
+}
+
+// OIDCConfig holds the OpenID Connect settings for operator sign-in.
+type OIDCConfig struct {
+	// Issuer is the OIDC discovery issuer URL (e.g. the Keycloak realm URL).
+	Issuer string
+	// ClientID identifies this application to the identity provider.
+	ClientID string
+	// ClientSecret authenticates a confidential client.
+	ClientSecret string
+}
+
+// Configured reports whether OIDC sign-in has the minimum settings to run.
+func (o OIDCConfig) Configured() bool {
+	return o.Issuer != "" && o.ClientID != ""
 }
 
 // Load reads configuration from the environment, applying defaults that target
@@ -40,6 +71,22 @@ func Load() (Config, error) {
 		AllowedOrigin:   getenv("KNULL_ALLOWED_ORIGIN", "http://localhost:3000"),
 		ShutdownTimeout: 10 * time.Second,
 		HealthTimeout:   3 * time.Second,
+		OIDC: OIDCConfig{
+			Issuer:       getenv("KNULL_OIDC_ISSUER", "http://localhost:8081/realms/knull"),
+			ClientID:     getenv("KNULL_OIDC_CLIENT_ID", "knull-backend"),
+			ClientSecret: getenv("KNULL_OIDC_CLIENT_SECRET", "knull-local-secret"),
+		},
+		SessionTTL:   8 * time.Hour,
+		CookieSecure: getenvBool("KNULL_COOKIE_SECURE", false),
+		AppBaseURL:   getenv("KNULL_APP_BASE_URL", "http://localhost:8080"),
+		UIBaseURL:    getenv("KNULL_UI_BASE_URL", "http://localhost:3000"),
+		SecretKey:    os.Getenv("KNULL_SECRET_KEY"),
+	}
+
+	if d, err := durationSeconds("KNULL_SESSION_TTL_SECONDS"); err != nil {
+		return Config{}, err
+	} else if d > 0 {
+		c.SessionTTL = d
 	}
 
 	if d, err := durationSeconds("KNULL_SHUTDOWN_TIMEOUT_SECONDS"); err != nil {
@@ -75,4 +122,16 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getenvBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
 }

@@ -47,11 +47,33 @@ jobs:
       - name: go build
         working-directory: backend
         run: go build ./...
+      - name: Start Keycloak with the Knull realm
+        run: |
+          docker run -d --name keycloak -p 8081:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false \
+            -v "${{ github.workspace }}/infra/keycloak:/opt/keycloak/data/import:ro" \
+            quay.io/keycloak/keycloak:26.0 start-dev --import-realm --http-port=8080
+          echo "waiting for keycloak realm discovery..."
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/realms/knull/.well-known/openid-configuration || true)
+            if [ "$code" = "200" ]; then echo "keycloak ready"; break; fi
+            sleep 3
+          done
+      - name: Apply migrations
+        working-directory: backend
+        env:
+          KNULL_DATABASE_URL: postgres://knull:knull@localhost:5432/knull?sslmode=disable
+          KNULL_REDIS_URL: redis://localhost:6379/0
+        run: go run ./cmd/migrate
       - name: go test
         working-directory: backend
         env:
           KNULL_DATABASE_URL: postgres://knull:knull@localhost:5432/knull?sslmode=disable
           KNULL_REDIS_URL: redis://localhost:6379/0
+          KNULL_TEST_DATABASE_URL: postgres://knull:knull@localhost:5432/knull?sslmode=disable
+          KNULL_TEST_OIDC_ISSUER: http://localhost:8081/realms/knull
         run: go test ./...
 
   frontend:

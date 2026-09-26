@@ -15,8 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
+	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
+	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/store"
 )
 
@@ -49,9 +52,49 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("migrations applied")
 
+	sessions := auth.NewSessionManager(st.Redis, cfg.SessionTTL, cfg.CookieSecure)
+	operatorStore := operators.NewStore(st.Pool)
+
+	var cipher *secrets.Cipher
+	if cfg.SecretKey != "" {
+		cipher, err = secrets.NewCipher(cfg.SecretKey)
+		if err != nil {
+			return err
+		}
+	} else {
+		logger.Warn("KNULL_SECRET_KEY not set; storing integration credentials is disabled")
+	}
+	secretStore := secrets.NewStore(st.Pool, cipher)
+
+	var authn *auth.Authenticator
+	if cfg.OIDC.Configured() {
+		redirectURL := cfg.AppBaseURL + "/api/auth/callback"
+		authn, err = auth.NewAuthenticator(ctx, cfg.OIDC.Issuer, cfg.OIDC.ClientID, cfg.OIDC.ClientSecret, redirectURL)
+		if err != nil {
+			// A missing identity provider must not crash the whole service; it
+			// degrades to health-only. Protected endpoints reject requests.
+			logger.Error("oidc initialization failed; sign-in disabled", "error", err)
+		} else {
+			logger.Info("oidc sign-in enabled", "issuer", cfg.OIDC.Issuer)
+		}
+	} else {
+		logger.Warn("OIDC not configured; operator sign-in is disabled")
+	}
+
 	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.New(st, cfg.AllowedOrigin, cfg.HealthTimeout).Handler(),
+		Addr: cfg.HTTPAddr,
+		Handler: httpapi.New(httpapi.Options{
+			Deps:          st,
+			AllowedOrigin: cfg.AllowedOrigin,
+			HealthTimeout: cfg.HealthTimeout,
+			Sessions:      sessions,
+			Authn:         authn,
+			Operators:     operatorStore,
+			Secrets:       secretStore,
+			AppBaseURL:    cfg.AppBaseURL,
+			UIBaseURL:     cfg.UIBaseURL,
+			Logger:        logger,
+		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
