@@ -200,6 +200,19 @@ selector, and a GitHub repository. The `(key, environment)` pair is unique, so
 the same service can exist in several environments without a mapping ever
 spanning two of them.
 
+**Prometheus findings:** connect a Prometheus MCP server at
+`KNULL_PROMETHEUS_MCP_URL` (and set `KNULL_PROMETHEUS_MCP_TOKEN` when required).
+Use the [`prometheus/prometheus-mcp` v0.18.0 Helm chart](https://github.com/prometheus/prometheus-mcp/releases/tag/v0.18.0)
+with a read-only Prometheus identity and its read-only tool set; do not enable
+management or TSDB administration tools. Set service `prometheusLabels` to a
+selector that identifies the workload and its `environment` label. The incident
+page's **Collect evidence** action records active alerts plus instant and
+15-minute range findings for CPU, memory, saturation, traffic, errors, and p95
+latency. The default query templates expect `container_*`, `http_requests_total`,
+and `http_request_duration_seconds_bucket` metrics; absent series appear as
+unavailable in the timeline. Production metric names that differ from these
+templates need a configured query mapping before the full incident demo.
+
 Run all checks the way CI does:
 
 ```bash

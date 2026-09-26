@@ -56,6 +56,31 @@ func TestCollectorRunsKubernetesAndRecordsEvidence(t *testing.T) {
 	}
 }
 
+func TestCollectorRunsPrometheusWhenKubernetesIsNotConfigured(t *testing.T) {
+	svcID := uuid.New()
+	svc := services.Service{
+		ID: svcID, Key: "checkout-api", Environment: "production",
+		PrometheusLabels: map[string]string{"app": "checkout-api", "environment": "production"},
+	}
+	inc := incidents.Incident{ID: uuid.New(), ServiceID: &svcID, ServiceKey: "checkout-api", Environment: "production"}
+	incStore := &fakeIncidentStore{inc: inc}
+	calls := &recordingCaller{result: `{"result":"{app=\"checkout-api\"} => 2 @[1790424000]","warnings":[]}`}
+	col := NewCollector(incStore, &fakeServiceStore{svc: svc}, nil, NewPrometheusInvestigator(calls))
+
+	if !col.Enabled() {
+		t.Fatal("collector should be enabled with a Prometheus investigator")
+	}
+	if err := col.Collect(context.Background(), inc.ID); err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if len(calls.calls) != 13 {
+		t.Fatalf("made %d Prometheus calls, want 13", len(calls.calls))
+	}
+	if len(incStore.events) != 13 {
+		t.Fatalf("recorded %d evidence events, want 13", len(incStore.events))
+	}
+}
+
 func TestCollectorErrorsWhenNoServiceMapping(t *testing.T) {
 	inc := incidents.Incident{ID: uuid.New()} // ServiceID nil
 	col := NewCollector(&fakeIncidentStore{inc: inc}, &fakeServiceStore{}, NewKubernetesInvestigator(&fakeCaller{}))

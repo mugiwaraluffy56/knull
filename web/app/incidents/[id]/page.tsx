@@ -117,7 +117,7 @@ export default function IncidentPage({
                 <span className={`cat cat-${e.category ?? "system"}`}>
                   {e.category ?? "system"}
                 </span>
-                <span className="timeline-body">
+                <div className="timeline-body">
                   {e.type === "STATE_CHANGE" ? (
                     <strong>
                       {e.fromState ? `${e.fromState} → ` : ""}
@@ -132,7 +132,8 @@ export default function IncidentPage({
                     <span className="timeline-src"> → {e.target}</span>
                   )}
                   <span className="timeline-actor"> · {e.actor || "system"}</span>
-                </span>
+                  {e.source === "prometheus" && <PrometheusFinding event={e} />}
+                </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
                 </span>
@@ -146,6 +147,29 @@ export default function IncidentPage({
         </Link>
       </section>
     </main>
+  );
+}
+
+function PrometheusFinding({ event }: { event: IncidentEvent }) {
+  const data = event.data;
+  if (!data) return null;
+  const signal = typeof data.signal === "string" ? data.signal : "metric";
+  const unit = typeof data.unit === "string" ? data.unit : "";
+  const result = typeof data.result === "string" ? data.result : "";
+  const query = typeof data.query === "string" ? data.query : "";
+  const window = data.window as
+    | { start?: string; end?: string; step?: string }
+    | undefined;
+
+  return (
+    <div className="metric-finding">
+      <strong>{signal}</strong>: {data.available === false ? "unavailable" : result || "no active alerts"}
+      {unit && <span> · {unit}</span>}
+      {window?.start && window?.end && (
+        <span> · {window.start} to {window.end} ({window.step})</span>
+      )}
+      {query && <code className="metric-query">{query}</code>}
+    </div>
   );
 }
 

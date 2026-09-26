@@ -25,19 +25,25 @@ type ServiceStore interface {
 // Collector runs the configured read-only investigators for an incident and
 // records their evidence. Each investigator is optional; only connected ones run.
 type Collector struct {
-	incidents IncidentStore
-	services  ServiceStore
-	k8s       *KubernetesInvestigator
+	incidents  IncidentStore
+	services   ServiceStore
+	k8s        *KubernetesInvestigator
+	prometheus *PrometheusInvestigator
 }
 
-// NewCollector builds a Collector with the Kubernetes investigator.
-func NewCollector(inc IncidentStore, svc ServiceStore, k8s *KubernetesInvestigator) *Collector {
-	return &Collector{incidents: inc, services: svc, k8s: k8s}
+// NewCollector builds a Collector with the connected investigators. The
+// variadic Prometheus argument keeps existing Kubernetes-only wiring valid.
+func NewCollector(inc IncidentStore, svc ServiceStore, k8s *KubernetesInvestigator, prometheus ...*PrometheusInvestigator) *Collector {
+	c := &Collector{incidents: inc, services: svc, k8s: k8s}
+	if len(prometheus) > 0 {
+		c.prometheus = prometheus[0]
+	}
+	return c
 }
 
 // Enabled reports whether at least one investigator is connected.
 func (c *Collector) Enabled() bool {
-	return c.k8s != nil
+	return c.k8s != nil || c.prometheus != nil
 }
 
 // Collect resolves the incident's service mapping and runs every connected
@@ -60,6 +66,9 @@ func (c *Collector) Collect(ctx context.Context, incidentID uuid.UUID) error {
 
 	if c.k8s != nil {
 		_ = c.k8s.Inspect(ctx, c.incidents, incidentID, t)
+	}
+	if c.prometheus != nil {
+		_ = c.prometheus.Inspect(ctx, c.incidents, incidentID, t)
 	}
 	return nil
 }

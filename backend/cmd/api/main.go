@@ -81,14 +81,25 @@ func run(logger *slog.Logger) error {
 		logger.Warn("KNULL_TRUEFORGE_URL not set; durable investigations are disabled")
 	}
 
-	var collector *investigate.Collector
+	var k8sInvestigator *investigate.KubernetesInvestigator
 	if cfg.K8sMCPURL != "" {
 		k8sClient := mcp.NewClient(mcp.NewHTTPTransport(cfg.K8sMCPURL, cfg.K8sMCPToken))
-		k8sInv := investigate.NewKubernetesInvestigator(k8sClient)
-		collector = investigate.NewCollector(incidentStore, serviceStore, k8sInv)
+		k8sInvestigator = investigate.NewKubernetesInvestigator(k8sClient)
 		logger.Info("kubernetes mcp investigation enabled", "url", cfg.K8sMCPURL)
 	} else {
 		logger.Warn("KNULL_K8S_MCP_URL not set; kubernetes investigation is disabled")
+	}
+	var prometheusInvestigator *investigate.PrometheusInvestigator
+	if cfg.PrometheusMCPURL != "" {
+		prometheusClient := mcp.NewClient(mcp.NewHTTPTransport(cfg.PrometheusMCPURL, cfg.PrometheusMCPToken))
+		prometheusInvestigator = investigate.NewPrometheusInvestigator(prometheusClient)
+		logger.Info("prometheus mcp investigation enabled", "url", cfg.PrometheusMCPURL)
+	} else {
+		logger.Warn("KNULL_PROMETHEUS_MCP_URL not set; prometheus investigation is disabled")
+	}
+	var collector *investigate.Collector
+	if k8sInvestigator != nil || prometheusInvestigator != nil {
+		collector = investigate.NewCollector(incidentStore, serviceStore, k8sInvestigator, prometheusInvestigator)
 	}
 
 	var cipher *secrets.Cipher
