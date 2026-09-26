@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import ApprovalReview from "./ApprovalReview";
 import {
   collectEvidence,
   fetchIncident,
@@ -65,7 +66,7 @@ export default function IncidentPage({
 
   return (
     <main className="page page-wide">
-      <section className="card card-wide">
+      <section className="card card-wide incident-page-card">
         <div className="incident-head">
           <div>
             <h1>{incident.serviceKey}</h1>
@@ -107,6 +108,8 @@ export default function IncidentPage({
           {collectMsg && <span className="auth-muted"> {collectMsg}</span>}
         </div>
 
+        <ApprovalReview incident={incident} events={events} onRefresh={load} />
+
         <h2 className="section-title">Timeline</h2>
         {events.length === 0 ? (
           <p className="auth-muted">No events yet.</p>
@@ -138,6 +141,8 @@ export default function IncidentPage({
                   {(e.source === "jev-next-action" || e.source === "jev-risk") && <JevDecision event={e} />}
                   {e.source === "action-plan" && <ActionPlan event={e} />}
                   {e.source === "sandbox" && <SandboxRun event={e} />}
+                  {e.source === "sandbox-validation" && <SandboxValidation event={e} />}
+                  {e.source === "approval" && <ApprovalDecision event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -209,6 +214,18 @@ function SandboxRun({ event }: { event: IncidentEvent }) {
     {Array.isArray(run.limitations) && run.limitations.map((item) => <div key={item}>Limitation: {item}</div>)}
     <div className="auth-muted">Prepared means isolated setup completed; validation has not passed.</div>
   </div>;
+}
+
+function SandboxValidation({ event }: { event: IncidentEvent }) {
+  const result = event.data?.result as { passed?: boolean; failure?: string; actionDigest?: string } | undefined;
+  if (!result) return null;
+  return <div className="metric-finding"><strong>{result.passed ? "Sandbox validation passed" : "Sandbox validation failed"}</strong>{result.failure && <div>{result.failure}</div>}{result.actionDigest && <div>Action digest {result.actionDigest.slice(0, 12)}</div>}</div>;
+}
+
+function ApprovalDecision({ event }: { event: IncidentEvent }) {
+  const data = event.data;
+  if (data?.decision !== "APPROVED" && data?.decision !== "DENIED" && data?.approval !== "invalidated") return null;
+  return <div className="metric-finding"><strong>{data.decision === "APPROVED" ? "Approved" : data.decision === "DENIED" ? "Denied" : "Approval invalidated"}</strong>{typeof data.actionDigest === "string" && <div>Action digest {data.actionDigest.slice(0, 12)}</div>}{typeof data.expiresAt === "string" && <div>Expires {new Date(data.expiresAt).toLocaleString()}</div>}</div>;
 }
 
 function PrometheusFinding({ event }: { event: IncidentEvent }) {

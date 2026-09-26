@@ -213,6 +213,43 @@ export async function setServiceEnabled(
 
 export type Incident = components["schemas"]["Incident"];
 export type IncidentEvent = components["schemas"]["IncidentEvent"];
+export type ActionContract = components["schemas"]["ActionContract"];
+export type ActionDecision = components["schemas"]["ActionDecision"];
+export type MemoryValidationResult = components["schemas"]["MemoryValidationResult"];
+
+export interface ActionDecisionResult {
+  decision?: ActionDecision;
+  error?: string;
+  status: number;
+}
+
+// The operator chooses an exact event and digest. The backend checks the
+// authenticated operator and validation; the browser cannot grant authority.
+export async function decideAction(
+  incidentId: string,
+  actionEventId: string,
+  actionDigest: string,
+  decision: "approve" | "deny",
+  reason = "",
+): Promise<ActionDecisionResult> {
+  const endpoint = decision === "approve" ? "approvals" : "denials";
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/${endpoint}`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionEventId, actionDigest, reason }),
+    });
+    if (res.ok) {
+      return { status: res.status, decision: (await res.json()) as ActionDecision };
+    }
+    const body = (await res.json()) as { error?: string };
+    return { status: res.status, error: body.error ?? `request failed (${res.status})` };
+  } catch (err) {
+    return { status: 0, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
 
 // fetchIncident returns one incident, or null when not found / unauthenticated.
 export async function fetchIncident(id: string): Promise<Incident | null> {
