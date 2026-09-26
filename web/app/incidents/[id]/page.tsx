@@ -87,30 +87,38 @@ export default function IncidentPage({
         )}
 
         <h2 className="section-title">Timeline</h2>
-        <ol className="timeline">
-          {events.map((e) => (
-            <li key={e.id} className="timeline-item">
-              <span className="timeline-seq">#{e.seq}</span>
-              <span className="timeline-body">
-                {e.type === "STATE_CHANGE" ? (
-                  <>
+        {events.length === 0 ? (
+          <p className="auth-muted">No events yet.</p>
+        ) : (
+          <ol className="timeline">
+            {events.map((e) => (
+              <li key={e.id} className="timeline-item">
+                <span className={`cat cat-${e.category ?? "system"}`}>
+                  {e.category ?? "system"}
+                </span>
+                <span className="timeline-body">
+                  {e.type === "STATE_CHANGE" ? (
                     <strong>
                       {e.fromState ? `${e.fromState} → ` : ""}
                       {e.toState}
                     </strong>
-                    {e.reason && <> — {e.reason}</>}
-                  </>
-                ) : (
-                  <>{e.reason || e.type}</>
-                )}
-                <span className="timeline-actor"> · {e.actor || "system"}</span>
-              </span>
-              <span className="timeline-time">
-                {new Date(e.createdAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ol>
+                  ) : null}
+                  {e.reason && <> {e.reason}</>}
+                  {e.source && (
+                    <span className="timeline-src"> · {e.source}</span>
+                  )}
+                  {e.target && (
+                    <span className="timeline-src"> → {e.target}</span>
+                  )}
+                  <span className="timeline-actor"> · {e.actor || "system"}</span>
+                </span>
+                <span className="timeline-time">
+                  {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
 
         <Link href="/fleet" className="navlink">
           ← Back to fleet

@@ -65,3 +65,25 @@ const (
 	EventStateChange EventType = "STATE_CHANGE"
 	EventNote        EventType = "NOTE"
 )
+
+// EventCategory separates the kinds of timeline entries so the UI can present
+// observed facts, hypotheses, decisions, and actions distinctly.
+type EventCategory string
+
+const (
+	CategorySystem      EventCategory = "system"      // lifecycle/process events
+	CategoryObservation EventCategory = "observation" // an observed fact / evidence
+	CategoryHypothesis  EventCategory = "hypothesis"  // a proposed explanation
+	CategoryDecision    EventCategory = "decision"    // a typed decision (e.g. Jev)
+	CategoryAction      EventCategory = "action"      // an action taken or proposed
+)
+
+// Valid reports whether c is a known category.
+func (c EventCategory) Valid() bool {
+	switch c {
+	case CategorySystem, CategoryObservation, CategoryHypothesis, CategoryDecision, CategoryAction:
+		return true
+	default:
+		return false
+	}
+}

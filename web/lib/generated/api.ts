@@ -411,6 +411,12 @@ export interface components {
             seq: number;
             /** @enum {string} */
             type: "STATE_CHANGE" | "NOTE";
+            /** @enum {string} */
+            category?: "system" | "observation" | "hypothesis" | "decision" | "action";
+            source?: string;
+            target?: string;
+            /** Format: date-time */
+            observedAt?: string;
             fromState?: components["schemas"]["IncidentState"];
             toState?: components["schemas"]["IncidentState"];
             actor: string;

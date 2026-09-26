@@ -658,6 +658,16 @@ components:
         type:
           type: string
           enum: [STATE_CHANGE, NOTE]
+        category:
+          type: string
+          enum: [system, observation, hypothesis, decision, action]
+        source:
+          type: string
+        target:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
         fromState:
           $ref: "#/components/schemas/IncidentState"
         toState:

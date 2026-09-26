@@ -364,3 +364,20 @@ code {
 .timeline-seq { color: var(--muted); font-size: 12px; }
 .timeline-actor { color: var(--muted); }
 .timeline-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* Timeline categories */
+.cat {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: start;
+}
+.cat-system { background: rgba(139,147,167,0.18); color: var(--muted); }
+.cat-observation { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.cat-hypothesis { background: rgba(245,158,11,0.18); color: #fbbf24; }
+.cat-decision { background: rgba(168,85,247,0.18); color: #c084fc; }
+.cat-action { background: rgba(46,204,113,0.15); color: var(--ok); }
+.timeline-src { color: var(--muted); }

@@ -47,13 +47,30 @@ type Event struct {
 	IncidentID    uuid.UUID      `json:"incidentId"`
 	Seq           int64          `json:"seq"`
 	Type          EventType      `json:"type"`
+	Category      EventCategory  `json:"category"`
+	Source        string         `json:"source,omitempty"`
+	Target        string         `json:"target,omitempty"`
 	FromState     State          `json:"fromState,omitempty"`
 	ToState       State          `json:"toState,omitempty"`
 	Actor         string         `json:"actor"`
 	Reason        string         `json:"reason"`
 	CorrelationID string         `json:"correlationId"`
 	Data          map[string]any `json:"data"`
+	ObservedAt    time.Time      `json:"observedAt"`
 	CreatedAt     time.Time      `json:"createdAt"`
+}
+
+// EventInput carries a rich, non-transition timeline entry (findings, decisions,
+// actions) added by the investigation. Sensitive data keys are redacted before
+// persistence.
+type EventInput struct {
+	Category   EventCategory
+	Source     string
+	Target     string
+	Actor      string
+	Reason     string
+	Data       map[string]any
+	ObservedAt time.Time // when it happened; defaults to now if zero
 }
 
 // NewIncident carries the fields needed to open an incident.
@@ -303,9 +320,13 @@ func (s *Store) ListActive(ctx context.Context) ([]Incident, error) {
 
 // Events returns an incident's full history in order.
 func (s *Store) Events(ctx context.Context, id uuid.UUID) ([]Event, error) {
+	// Order by observed (event) time, falling back to ingestion time, then seq,
+	// so out-of-order arrivals still display in the order things happened.
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, incident_id, seq, type, from_state, to_state, actor, reason, correlation_id, data, created_at
-		FROM incident_events WHERE incident_id = $1 ORDER BY seq`, id)
+		SELECT id, incident_id, seq, type, category, source, target, from_state, to_state,
+		       actor, reason, correlation_id, data, COALESCE(observed_at, created_at), created_at
+		FROM incident_events WHERE incident_id = $1
+		ORDER BY COALESCE(observed_at, created_at), seq`, id)
 	if err != nil {
 		return nil, fmt.Errorf("list events: %w", err)
 	}
@@ -314,8 +335,9 @@ func (s *Store) Events(ctx context.Context, id uuid.UUID) ([]Event, error) {
 	var out []Event
 	for rows.Next() {
 		var e Event
-		if err := rows.Scan(&e.ID, &e.IncidentID, &e.Seq, &e.Type, &e.FromState,
-			&e.ToState, &e.Actor, &e.Reason, &e.CorrelationID, &e.Data, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.IncidentID, &e.Seq, &e.Type, &e.Category, &e.Source, &e.Target,
+			&e.FromState, &e.ToState, &e.Actor, &e.Reason, &e.CorrelationID, &e.Data,
+			&e.ObservedAt, &e.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
 		out = append(out, e)
@@ -378,17 +400,65 @@ func (s *Store) ListResumable(ctx context.Context) ([]Incident, error) {
 
 // appendEvent inserts one immutable history row. The UNIQUE(incident_id, seq)
 // constraint makes a duplicate append fail rather than corrupt the history.
+// Sensitive data keys are redacted so credentials never reach the timeline.
 func appendEvent(ctx context.Context, tx pgx.Tx, incidentID uuid.UUID, seq int64, e Event) error {
-	if e.Data == nil {
-		e.Data = map[string]any{}
+	if e.Category == "" {
+		e.Category = CategorySystem
+	}
+	data := redactData(e.Data)
+	if data == nil {
+		data = map[string]any{}
+	}
+	observed := e.ObservedAt
+	if observed.IsZero() {
+		observed = time.Now().UTC()
 	}
 	_, err := tx.Exec(ctx, `
-		INSERT INTO incident_events (incident_id, seq, type, from_state, to_state, actor, reason, correlation_id, data)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-		incidentID, seq, string(e.Type), string(e.FromState), string(e.ToState),
-		e.Actor, e.Reason, e.CorrelationID, e.Data)
+		INSERT INTO incident_events
+			(incident_id, seq, type, category, source, target, from_state, to_state, actor, reason, correlation_id, data, observed_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		incidentID, seq, string(e.Type), string(e.Category), e.Source, e.Target,
+		string(e.FromState), string(e.ToState), e.Actor, e.Reason, e.CorrelationID, data, observed)
 	if err != nil {
 		return fmt.Errorf("append event: %w", err)
 	}
 	return nil
+}
+
+// AppendEvent appends a rich, non-transition timeline entry (a finding,
+// hypothesis, decision, or action) to an incident's history.
+func (s *Store) AppendEvent(ctx context.Context, id uuid.UUID, in EventInput) error {
+	if in.Category == "" {
+		in.Category = CategoryObservation
+	}
+	if !in.Category.Valid() {
+		return fmt.Errorf("invalid event category %q", in.Category)
+	}
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM incidents WHERE id=$1)`, id).Scan(&exists); err != nil {
+			return fmt.Errorf("check incident: %w", err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
+		var seq int64
+		if err := tx.QueryRow(ctx,
+			`SELECT COALESCE(MAX(seq),0)+1 FROM incident_events WHERE incident_id=$1`, id).Scan(&seq); err != nil {
+			return fmt.Errorf("next seq: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE incidents SET updated_at = now() WHERE id = $1`, id); err != nil {
+			return fmt.Errorf("touch incident: %w", err)
+		}
+		return appendEvent(ctx, tx, id, seq, Event{
+			Type:       EventNote,
+			Category:   in.Category,
+			Source:     in.Source,
+			Target:     in.Target,
+			Actor:      in.Actor,
+			Reason:     in.Reason,
+			Data:       in.Data,
+			ObservedAt: in.ObservedAt,
+		})
+	})
 }
