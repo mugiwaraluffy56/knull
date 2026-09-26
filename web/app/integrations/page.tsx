@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   CREDENTIAL_KINDS,
   CREDENTIAL_SCOPES,
+  fetchIntegrationHealth,
   listCredentials,
   loginURL,
   putCredential,
   type CredentialKind,
   type CredentialMetadata,
   type CredentialScope,
+  type IntegrationState,
 } from "@/lib/api";
 
 // Integrations configuration. Operators store integration credentials here.
@@ -18,6 +20,7 @@ import {
 export default function IntegrationsPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [creds, setCreds] = useState<CredentialMetadata[]>([]);
+  const [integrations, setIntegrations] = useState<Record<string, IntegrationState>>({});
   const [kind, setKind] = useState<CredentialKind>("kubernetes");
   const [scope, setScope] = useState<CredentialScope>("read");
   const [value, setValue] = useState("");
@@ -25,9 +28,10 @@ export default function IntegrationsPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await listCredentials();
+    const [res, health] = await Promise.all([listCredentials(), fetchIntegrationHealth()]);
     setAuthenticated(res.authenticated);
     setCreds(res.credentials);
+    setIntegrations(health.integrations);
   }, []);
 
   useEffect(() => {
@@ -79,6 +83,19 @@ export default function IntegrationsPage() {
           shown again.
         </p>
 
+        <h2>Runtime connections</h2>
+        <p className="auth-muted">These checks reflect the endpoints configured on the Knull server. Add credentials here only where the deployment is wired to consume them.</p>
+        <table className="cred-table">
+          <thead><tr><th>Connection</th><th>Status</th><th>Last successful check</th><th>Active incidents affected</th></tr></thead>
+          <tbody>{Object.entries(integrations).map(([name, state]) => <tr key={name}>
+            <td><strong>{name}</strong></td>
+            <td><span className={`scope ${state.status === "ok" ? "scope-read" : "scope-production"}`}>{state.status}</span>{state.lastError && <div className="auth-muted">{state.lastError}</div>}</td>
+            <td className="auth-muted">{state.lastSuccess ? new Date(state.lastSuccess).toLocaleString() : "—"}</td>
+            <td className="auth-muted">{state.affectedIncidents?.length ?? 0}</td>
+          </tr>)}{Object.keys(integrations).length === 0 && <tr><td colSpan={4} className="auth-muted">No runtime health data returned.</td></tr>}</tbody>
+        </table>
+
+        <h2>Credential vault</h2>
         <form className="cred-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="kind">Integration</label>

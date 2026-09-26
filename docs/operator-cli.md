@@ -17,11 +17,17 @@ knullctl integrations
 knullctl incidents
 knullctl incident INCIDENT_UUID
 knullctl events INCIDENT_UUID
+knullctl workflow INCIDENT_UUID
 knullctl start SERVICE_UUID "checkout failures"
 knullctl --json incidents
+knullctl --json workflow INCIDENT_UUID
 ```
 
 `check` reports API and dependency readiness. `integrations` lists credential
 metadata only. `events` shows investigation progress and full incident history.
+`workflow` fetches the incident and its event history through the same
+authenticated API endpoints, then summarizes its current state, TrueForge
+session/run identifiers, and ordered progress events. With `--json`, it returns
+an object containing the raw `incident` and `events` API responses.
 Each error returns a nonzero exit code. No command can bypass approval or
 write to Kubernetes directly.

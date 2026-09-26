@@ -93,6 +93,26 @@ func run(args []string, out io.Writer) error {
 		if parts[0] == "events" {
 			path += "/events"
 		}
+	case "workflow":
+		if len(parts) != 2 {
+			return usage()
+		}
+		id, err := uuid.Parse(parts[1])
+		if err != nil {
+			return errors.New("incident ID must be a UUID")
+		}
+		if c.cookie == "" {
+			return errors.New("KNULL_SESSION_COOKIE is required; sign in through the web UI and supply its session cookie")
+		}
+		incident, err := c.request(ctx, http.MethodGet, "/api/incidents/"+id.String(), nil)
+		if err != nil {
+			return err
+		}
+		events, err := c.request(ctx, http.MethodGet, "/api/incidents/"+id.String()+"/events", nil)
+		if err != nil {
+			return err
+		}
+		return printWorkflow(out, *jsonMode, incident, events)
 	case "start":
 		if len(parts) < 3 {
 			return errors.New("usage: knullctl start SERVICE_UUID SUMMARY")
@@ -179,6 +199,80 @@ func printHuman(out io.Writer, command string, data []byte) error {
 	return err
 }
 
+type workflowIncident struct {
+	ID                string `json:"id"`
+	ServiceKey        string `json:"serviceKey"`
+	Environment       string `json:"environment"`
+	Summary           string `json:"summary"`
+	State             string `json:"state"`
+	WorkflowSessionID string `json:"workflowSessionId"`
+	WorkflowRunID     string `json:"workflowRunId"`
+}
+
+type workflowEvent struct {
+	Seq       int64          `json:"seq"`
+	Type      string         `json:"type"`
+	Category  string         `json:"category"`
+	Source    string         `json:"source"`
+	Reason    string         `json:"reason"`
+	Data      map[string]any `json:"data"`
+	CreatedAt time.Time      `json:"createdAt"`
+}
+
+func printWorkflow(out io.Writer, jsonMode bool, incidentData, eventData []byte) error {
+	var incident workflowIncident
+	if err := json.Unmarshal(incidentData, &incident); err != nil {
+		return fmt.Errorf("decode incident response: %w", err)
+	}
+	var eventEnvelope struct {
+		Events []workflowEvent `json:"events"`
+	}
+	if err := json.Unmarshal(eventData, &eventEnvelope); err != nil {
+		return fmt.Errorf("decode incident events response: %w", err)
+	}
+	if jsonMode {
+		var rawIncident, rawEvents json.RawMessage
+		if err := json.Unmarshal(incidentData, &rawIncident); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(eventData, &rawEvents); err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(struct {
+			Incident json.RawMessage `json:"incident"`
+			Events   json.RawMessage `json:"events"`
+		}{rawIncident, rawEvents})
+	}
+
+	if _, err := fmt.Fprintf(out, "Incident %s\nState: %s\nService: %s (%s)\nSummary: %s\n", incident.ID, valueOr(incident.State, "unknown"), valueOr(incident.ServiceKey, "unmapped"), valueOr(incident.Environment, "unknown"), valueOr(incident.Summary, "(none)")); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "Workflow session: %s\nWorkflow run: %s\nProgress events: %d\n", valueOr(incident.WorkflowSessionID, "not started"), valueOr(incident.WorkflowRunID, "not started"), len(eventEnvelope.Events)); err != nil {
+		return err
+	}
+	for _, event := range eventEnvelope.Events {
+		detail := event.Reason
+		if trueforgeType, ok := event.Data["trueforgeType"].(string); ok && trueforgeType != "" {
+			detail = trueforgeType + ": " + detail
+		}
+		label := event.Category
+		if label == "" {
+			label = event.Type
+		}
+		if _, err := fmt.Fprintf(out, "  #%d %s %s — %s\n", event.Seq, event.CreatedAt.Format(time.RFC3339), valueOr(label, "event"), valueOr(detail, "(no details)")); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func valueOr(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
 func envOr(name, fallback string) string {
 	if value := os.Getenv(name); value != "" {
 		return value
@@ -187,5 +281,5 @@ func envOr(name, fallback string) string {
 }
 
 func usage() error {
-	return errors.New("usage: knullctl [--api URL] [--json] check|health|services|integrations|incidents|incident UUID|events UUID|start SERVICE_UUID SUMMARY")
+	return errors.New("usage: knullctl [--api URL] [--json] check|health|services|integrations|incidents|incident UUID|events UUID|workflow UUID|start SERVICE_UUID SUMMARY")
 }

@@ -75,6 +75,21 @@ export interface CredentialsResult {
   credentials: CredentialMetadata[];
 }
 
+export interface IntegrationState {
+  status: "ok" | "unavailable" | "disabled";
+  lastSuccess?: string;
+  lastError?: string;
+  affectedIncidents?: string[];
+}
+
+export async function fetchIntegrationHealth(): Promise<{ authenticated: boolean; integrations: Record<string, IntegrationState> }> {
+  const res = await fetch(`${API_BASE_URL}/api/integrations/health`, { cache: "no-store", credentials: "include" });
+  if (res.status === 401) return { authenticated: false, integrations: {} };
+  if (!res.ok) return { authenticated: true, integrations: {} };
+  const body = await res.json() as { integrations?: Record<string, IntegrationState> };
+  return { authenticated: true, integrations: body.integrations ?? {} };
+}
+
 // listCredentials returns credential metadata. When the caller is not
 // authenticated it reports authenticated=false so the page can prompt sign-in.
 export async function listCredentials(
@@ -245,6 +260,70 @@ export type ActionContract = components["schemas"]["ActionContract"];
 export type ActionDraft = components["schemas"]["ActionDraft"];
 export type ActionDecision = components["schemas"]["ActionDecision"];
 export type MemoryValidationResult = components["schemas"]["MemoryValidationResult"];
+
+export type MemoryExecutionStatus = "ACCEPTED" | "COMPLETED" | "FAILED" | "UNKNOWN";
+
+export interface MemoryExecutionReceipt {
+  requestId: string;
+  priorRequestId?: string;
+  actionEventId: string;
+  actionDigest: string;
+  status: MemoryExecutionStatus;
+  target: ActionContract["target"];
+  field: string;
+  submittedPatch?: unknown;
+  resourceUid?: string;
+  resourceVersion?: string;
+  resultingValue?: string;
+  observedAt: string;
+}
+
+export interface MemoryExecutionResult {
+  receipt?: MemoryExecutionReceipt;
+  error?: string;
+  status: number;
+}
+
+async function memoryExecutionRequest(
+  incidentId: string,
+  actionEventId: string,
+  actionDigest: string,
+  reconcile: boolean,
+): Promise<MemoryExecutionResult> {
+  const suffix = reconcile ? "/reconcile" : "";
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/executions/memory${suffix}`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionEventId, actionDigest }),
+    });
+    const body = await res.json() as MemoryExecutionReceipt | { error?: string };
+    if ("requestId" in body && typeof body.requestId === "string") {
+      return {
+        receipt: body as MemoryExecutionReceipt,
+        status: res.status,
+        error: res.ok || res.status === 202 ? undefined : `request failed (${res.status})`,
+      };
+    }
+    return { status: res.status, error: (body as { error?: string }).error ?? `request failed (${res.status})` };
+  } catch (err) {
+    return { status: 0, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
+
+// Production execution is an explicit operator action after approval. The
+// backend validates the exact approval, action event, and digest again.
+export function executeMemoryAction(incidentId: string, actionEventId: string, actionDigest: string): Promise<MemoryExecutionResult> {
+  return memoryExecutionRequest(incidentId, actionEventId, actionDigest, false);
+}
+
+// Reconciliation reads the result of an uncertain execution and only retries
+// when the backend can prove the original target preconditions still hold.
+export function reconcileMemoryAction(incidentId: string, actionEventId: string, actionDigest: string): Promise<MemoryExecutionResult> {
+  return memoryExecutionRequest(incidentId, actionEventId, actionDigest, true);
+}
 
 export async function incidentOperation(id: string, operation: "close" | "escalate" | "recovery/verify", expectedVersion?: number, reason = ""): Promise<string | null> {
 	try {

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   decideAction,
+  executeMemoryAction,
   fetchIncident,
   fetchIncidentEvents,
+  reconcileMemoryAction,
   type ActionContract,
   type Incident,
   type IncidentEvent,
+  type MemoryExecutionReceipt,
   type MemoryValidationResult,
 } from "@/lib/api";
 
@@ -18,6 +21,8 @@ type Review = {
   validation?: MemoryValidationResult;
   decisionEvent?: IncidentEvent;
   invalidationEvent?: IncidentEvent;
+  executionEvent?: IncidentEvent;
+  execution?: MemoryExecutionReceipt;
 };
 
 function latestReview(events: IncidentEvent[]): Review | null {
@@ -32,6 +37,12 @@ function latestReview(events: IncidentEvent[]): Review | null {
   });
   const validation = validationEvent?.data?.result as MemoryValidationResult | undefined;
   const decisionEvents = ordered.filter((event) => event.source === "approval" && event.data?.actionEventId === actionEvent.id && event.data?.actionDigest === action.digest);
+  const executionEvent = ordered.find((event) => {
+    if (event.source !== "production-executor") return false;
+    const receipt = event.data?.execution as MemoryExecutionReceipt | undefined;
+    return receipt?.actionEventId === actionEvent.id && receipt.actionDigest === action.digest;
+  });
+  const execution = executionEvent?.data?.execution as MemoryExecutionReceipt | undefined;
   return {
     actionEvent,
     action,
@@ -39,6 +50,8 @@ function latestReview(events: IncidentEvent[]): Review | null {
     validation,
     decisionEvent: decisionEvents.find((event) => event.data?.decision === "APPROVED" || event.data?.decision === "DENIED"),
     invalidationEvent: decisionEvents.find((event) => event.data?.approval === "invalidated"),
+    executionEvent,
+    execution,
   };
 }
 
@@ -114,6 +127,8 @@ export default function ApprovalReview({ incident, events, onRefresh }: {
   const [reason, setReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [executionReceipt, setExecutionReceipt] = useState<MemoryExecutionReceipt | null>(null);
+  const [executionMessage, setExecutionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -122,6 +137,12 @@ export default function ApprovalReview({ incident, events, onRefresh }: {
 
   if (!review) return null;
   const { action, validation, validationEvent, decisionEvent, invalidationEvent } = review;
+  const matchingLocalExecution = executionReceipt?.actionEventId === review.actionEvent.id && executionReceipt.actionDigest === action.digest
+    ? executionReceipt
+    : undefined;
+  const execution = matchingLocalExecution && (!review.execution || Date.parse(matchingLocalExecution.observedAt) >= Date.parse(review.execution.observedAt))
+    ? matchingLocalExecution
+    : review.execution;
   const state = reviewState(incident, review, now);
   const canDecide = state === "pending" && !processing;
   const expiresAt = typeof decisionEvent?.data?.expiresAt === "string" ? decisionEvent.data.expiresAt : undefined;
@@ -155,6 +176,41 @@ export default function ApprovalReview({ incident, events, onRefresh }: {
       await onRefresh();
     } catch {
       setMessage("Could not refresh the incident. No decision was submitted; try again.");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function runExecution(reconcile = false) {
+    if (!review || processing) return;
+    setProcessing(true);
+    setExecutionMessage(null);
+    try {
+      if (!reconcile) {
+        // Approval is a separate operator action from execution. Re-read the
+        // exact approved review before making the explicit production request.
+        const [freshIncident, freshEvents] = await Promise.all([
+          fetchIncident(incident.id),
+          fetchIncidentEvents(incident.id),
+        ]);
+        const freshReview = latestReview(freshEvents);
+        if (!freshIncident || !freshReview || freshIncident.version !== incident.version || freshReview.actionEvent.id !== review.actionEvent.id || freshReview.action.digest !== action.digest || reviewState(freshIncident, freshReview, Date.now()) !== "approved") {
+          setExecutionMessage("This approval changed or expired. Refresh the incident before executing.");
+          await onRefresh();
+          return;
+        }
+      }
+      const result = reconcile
+        ? await reconcileMemoryAction(incident.id, review.actionEvent.id, action.digest)
+        : await executeMemoryAction(incident.id, review.actionEvent.id, action.digest);
+      if (result.receipt) setExecutionReceipt(result.receipt);
+      if (result.error) setExecutionMessage(result.receipt
+        ? "The request returned an execution receipt. Check its status below before taking another action."
+        : result.error);
+      else setExecutionMessage(null);
+      await onRefresh();
+    } catch {
+      setExecutionMessage("Could not confirm the execution result. Refresh the incident and reconcile before retrying.");
     } finally {
       setProcessing(false);
     }
@@ -194,5 +250,22 @@ export default function ApprovalReview({ incident, events, onRefresh }: {
       <p id="approval-help">APPLY records approval for this exact action. Production execution requires a fresh target check.</p>
     </div>}
     {message && <p className="approval-message" role="status" aria-live="polite">{message}</p>}
+
+    {(state === "approved" || state === "remediating" || execution) && <div className="approval-controls approval-execution">
+      <div className="approval-section-head"><h3>Production execution</h3><span>{execution ? readableTime(execution.observedAt) : "Approval recorded"}</span></div>
+      {execution ? <>
+        <p className={`approval-validation ${execution.status === "COMPLETED" ? "approval-validation-pass" : execution.status === "FAILED" ? "approval-validation-fail" : "approval-validation-wait"}`} role="status" aria-live="polite">
+          {execution.status === "COMPLETED" ? `Completed · live value ${execution.resultingValue ?? "confirmed"}`
+            : execution.status === "ACCEPTED" ? "Accepted · patch submitted; live result still needs confirmation"
+              : execution.status === "UNKNOWN" ? "Unknown · the write outcome could not be confirmed"
+                : "Failed · no successful production change was confirmed"}
+        </p>
+        <div className="approval-meta"><span>Request <code>{execution.requestId}</code></span>{execution.resourceVersion && <span>Resource version <code>{execution.resourceVersion}</code></span>}{execution.resultingValue && <span>Observed value <code>{execution.resultingValue}</code></span>}</div>
+      </> : <p className="approval-validation approval-validation-wait">{state === "remediating" ? "Execution was claimed, but no receipt is recorded yet. Reconcile the exact approved action to inspect the live target." : "Approval is recorded for this exact action. Production will change only after you start execution."}</p>}
+      {state === "approved" && !execution && <div className="approval-buttons"><button type="button" className="approval-apply" disabled={processing} onClick={() => runExecution(false)}>{processing ? "Checking target…" : "EXECUTE APPROVED CHANGE"}</button></div>}
+      {state === "remediating" && (!execution || execution.status === "ACCEPTED" || execution.status === "UNKNOWN") && <div className="approval-buttons"><button type="button" className="approval-apply" disabled={processing} onClick={() => runExecution(true)}>{processing ? "Reconciling…" : "RECONCILE OUTCOME"}</button></div>}
+      <p id="execution-help">Execution uses the approved action event and digest. An uncertain result must be reconciled against the live target before retrying.</p>
+      {executionMessage && <p className="approval-message" role="status" aria-live="polite">{executionMessage}</p>}
+    </div>}
   </section>;
 }
