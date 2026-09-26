@@ -70,15 +70,15 @@ func (e *TrueForgeScriptEngine) GenerateAndExecute(ctx context.Context, req Scri
 	callCtx, cancel := context.WithTimeout(ctx, time.Duration(req.DurationSeconds+90)*time.Second)
 	defer cancel()
 	spec := map[string]any{
-		"model": map[string]string{"name": e.config.Model},
+		"model":        map[string]string{"name": e.config.Model},
 		"instructions": "Generate one Python 3.13 standard-library script for a disposable EKS validation Job. Do not execute it. Return only a JSON object with a code string. The backend will execute it in a restricted EKS namespace. The script must read TARGET_URL, NAMESPACE, ACTION_DIGEST, MAX_REQUESTS and DURATION_SECONDS from environment, send bounded GET requests to TARGET_URL (already ending in /checkout), and print only a JSON report containing namespace, actionDigest, podHealthy, errorRate, p95Milliseconds, and samples. Count failed HTTP attempts as errors; a failed checkout at 256Mi is expected and must still produce a JSON report with podHealthy false and exit 0. Exit nonzero only when no attempt or report is possible. Never request or print credentials. Do not access Kubernetes API, metadata endpoints, or other hosts.",
 		"config": map[string]any{
-			"sandbox": map[string]bool{"enabled": false},
+			"sandbox":            map[string]bool{"enabled": false},
 			"dynamic_sub_agents": map[string]bool{"enabled": false},
-			"web_search": map[string]bool{"enabled": false},
-			"generative_ui": map[string]bool{"enabled": false},
+			"web_search":         map[string]bool{"enabled": false},
+			"generative_ui":      map[string]bool{"enabled": false},
 			"ask_user_questions": map[string]bool{"enabled": false},
-			"iteration_limit": 4,
+			"iteration_limit":    4,
 		},
 	}
 	var created struct {
@@ -88,7 +88,7 @@ func (e *TrueForgeScriptEngine) GenerateAndExecute(ctx context.Context, req Scri
 	}
 	baseURL := strings.TrimRight(base.String(), "/")
 	if err := e.postJSON(callCtx, baseURL+"/api/v1/sessions", map[string]any{
-		"agent": map[string]any{"spec": spec},
+		"agent":    map[string]any{"spec": spec},
 		"metadata": map[string]string{"purpose": "knull-memory-validation", "namespace": req.Namespace},
 	}, &created); err != nil {
 		return ScriptResult{}, err
@@ -187,7 +187,7 @@ func readGeneratedCode(ctx context.Context, body io.Reader) (string, string, err
 				TurnID string `json:"turn_id"`
 				State  struct {
 					Status          string `json:"status"`
-					RequiredActions []any `json:"required_actions"`
+					RequiredActions []any  `json:"required_actions"`
 					Output          struct {
 						Content any `json:"content"`
 					} `json:"output"`
