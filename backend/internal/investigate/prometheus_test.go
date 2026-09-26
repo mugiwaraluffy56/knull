@@ -81,8 +81,8 @@ func TestPrometheusEmptyMetricSeriesIsUnavailableButNoAlertsIsAvailable(t *testi
 
 func TestPrometheusMissingOrInvalidSelectorDoesNotQuery(t *testing.T) {
 	for name, labels := range map[string]map[string]string{
-		"missing": {},
-		"invalid": {`app"} or vector(1) #`: "x"},
+		"missing":           {},
+		"invalid":           {`app"} or vector(1) #`: "x"},
 		"wrong environment": {"app": "checkout-api", "environment": "staging"},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -113,6 +113,14 @@ Knull reuses MCP servers for Kubernetes, Prometheus, and GitHub. It builds
 `jev-mcp` and the backend policy/execution services. External MCP servers are
 not granted production mutation credentials.
 
+The Jev MCP server is runnable with `cd backend && go run ./cmd/jev-mcp` after
+setting `KNULL_JEV_OPENAI_API_KEY` in its process environment. It serves MCP
+streamable HTTP at `127.0.0.1:8090` by default; see `backend/.env.example` for
+model, timeout, retry, and request/output-token limits. The server exposes only
+the four decision tools below and sends incident evidence to the configured
+OpenAI model. Keep the server on a trusted network and put authentication at
+the ingress if remote MCP clients need access.
+
 ### What Jev decides
 
 Jev answers four questions with typed results, evidence references, and uncertainty:
