@@ -38,6 +38,7 @@ type Options struct {
 	Operators     operatorStore
 	Secrets       secretStore
 	Services      serviceStore
+	Incidents     incidentStore
 	AppBaseURL    string
 	UIBaseURL     string
 	Logger        *slog.Logger
@@ -53,6 +54,7 @@ type Server struct {
 	operators     operatorStore
 	secrets       secretStore
 	services      serviceStore
+	incidents     incidentStore
 	appBaseURL    string
 	uiBaseURL     string
 	logger        *slog.Logger
@@ -75,6 +77,7 @@ func New(opts Options) *Server {
 		operators:     opts.Operators,
 		secrets:       opts.Secrets,
 		services:      opts.Services,
+		incidents:     opts.Incidents,
 		appBaseURL:    opts.AppBaseURL,
 		uiBaseURL:     opts.UIBaseURL,
 		logger:        opts.Logger,
@@ -102,6 +105,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/services/{id}", s.requireOperator(http.HandlerFunc(s.handleGetService)))
 	mux.Handle("PUT /api/services/{id}", s.requireOperator(http.HandlerFunc(s.handleUpdateService)))
 	mux.Handle("PATCH /api/services/{id}/enabled", s.requireOperator(http.HandlerFunc(s.handleSetServiceEnabled)))
+
+	mux.Handle("GET /api/incidents", s.requireOperator(http.HandlerFunc(s.handleListIncidents)))
+	mux.Handle("GET /api/incidents/{id}", s.requireOperator(http.HandlerFunc(s.handleGetIncident)))
+	mux.Handle("GET /api/incidents/{id}/events", s.requireOperator(http.HandlerFunc(s.handleListIncidentEvents)))
 
 	return s.withCORS(mux)
 }

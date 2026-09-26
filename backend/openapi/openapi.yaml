@@ -260,9 +260,83 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/incidents:
+    get:
+      operationId: listIncidents
+      summary: List incidents
+      responses:
+        "200":
+          description: Incidents, most recently updated first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [incidents]
+                properties:
+                  incidents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Incident"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/incidents/{id}:
+    get:
+      operationId: getIncident
+      summary: Get an incident
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      responses:
+        "200":
+          description: The incident.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/incidents/{id}/events:
+    get:
+      operationId: listIncidentEvents
+      summary: Get an incident's audit history
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      responses:
+        "200":
+          description: Ordered audit events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IncidentEvent"
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   parameters:
     ServiceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IncidentId:
       name: id
       in: path
       required: true
@@ -409,3 +483,89 @@ components:
             updatedAt:
               type: string
               format: date-time
+    IncidentState:
+      type: string
+      enum:
+        - RECEIVED
+        - INVESTIGATING
+        - PLANNING
+        - VALIDATING
+        - AWAITING_APPROVAL
+        - REMEDIATING
+        - VERIFYING
+        - RECOVERED
+        - ESCALATED
+        - DENIED
+        - FAILED
+        - CLOSED
+    Incident:
+      type: object
+      required:
+        [id, serviceKey, environment, state, version, correlationId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        serviceKey:
+          type: string
+        environment:
+          type: string
+        alertIdentity:
+          type: string
+        summary:
+          type: string
+        symptoms:
+          type: object
+          additionalProperties:
+            type: string
+        state:
+          $ref: "#/components/schemas/IncidentState"
+        version:
+          type: integer
+          format: int64
+        correlationId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+    IncidentEvent:
+      type: object
+      required: [id, incidentId, seq, type, actor, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        incidentId:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [STATE_CHANGE, NOTE]
+        fromState:
+          $ref: "#/components/schemas/IncidentState"
+        toState:
+          $ref: "#/components/schemas/IncidentState"
+        actor:
+          type: string
+        reason:
+          type: string
+        correlationId:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time

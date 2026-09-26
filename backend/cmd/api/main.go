@@ -18,6 +18,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
+	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
@@ -56,6 +57,7 @@ func run(logger *slog.Logger) error {
 	sessions := auth.NewSessionManager(st.Redis, cfg.SessionTTL, cfg.CookieSecure)
 	operatorStore := operators.NewStore(st.Pool)
 	serviceStore := services.NewStore(st.Pool)
+	incidentStore := incidents.NewStore(st.Pool)
 
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
@@ -94,6 +96,7 @@ func run(logger *slog.Logger) error {
 			Operators:     operatorStore,
 			Secrets:       secretStore,
 			Services:      serviceStore,
+			Incidents:     incidentStore,
 			AppBaseURL:    cfg.AppBaseURL,
 			UIBaseURL:     cfg.UIBaseURL,
 			Logger:        logger,
