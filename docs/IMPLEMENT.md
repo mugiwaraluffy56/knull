@@ -451,7 +451,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - No approval, wrong target, stale value, or altered action produces no mutation.
 - The execution result and resulting resource value appear in incident history.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; targeted Go tests and CI pass. PR/commit: 90c0fc5 (live production mutation pending a customer target)
 
 ### 22. Reconcile uncertain production outcomes safely
 
