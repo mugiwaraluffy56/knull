@@ -402,6 +402,9 @@ func (s *Store) ListResumable(ctx context.Context) ([]Incident, error) {
 // constraint makes a duplicate append fail rather than corrupt the history.
 // Sensitive data keys are redacted so credentials never reach the timeline.
 func appendEvent(ctx context.Context, tx pgx.Tx, incidentID uuid.UUID, seq int64, e Event) error {
+	if e.ID == uuid.Nil {
+		e.ID = uuid.New()
+	}
 	if e.Category == "" {
 		e.Category = CategorySystem
 	}
@@ -415,9 +418,9 @@ func appendEvent(ctx context.Context, tx pgx.Tx, incidentID uuid.UUID, seq int64
 	}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO incident_events
-			(incident_id, seq, type, category, source, target, from_state, to_state, actor, reason, correlation_id, data, observed_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		incidentID, seq, string(e.Type), string(e.Category), e.Source, e.Target,
+			(id, incident_id, seq, type, category, source, target, from_state, to_state, actor, reason, correlation_id, data, observed_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		e.ID, incidentID, seq, string(e.Type), string(e.Category), e.Source, e.Target,
 		string(e.FromState), string(e.ToState), e.Actor, e.Reason, e.CorrelationID, data, observed)
 	if err != nil {
 		return fmt.Errorf("append event: %w", err)
@@ -428,13 +431,20 @@ func appendEvent(ctx context.Context, tx pgx.Tx, incidentID uuid.UUID, seq int64
 // AppendEvent appends a rich, non-transition timeline entry (a finding,
 // hypothesis, decision, or action) to an incident's history.
 func (s *Store) AppendEvent(ctx context.Context, id uuid.UUID, in EventInput) error {
+	_, err := s.AppendEventID(ctx, id, in)
+	return err
+}
+
+// AppendEventID returns the stable ID of the newly persisted timeline entry.
+func (s *Store) AppendEventID(ctx context.Context, id uuid.UUID, in EventInput) (uuid.UUID, error) {
 	if in.Category == "" {
 		in.Category = CategoryObservation
 	}
 	if !in.Category.Valid() {
-		return fmt.Errorf("invalid event category %q", in.Category)
+		return uuid.Nil, fmt.Errorf("invalid event category %q", in.Category)
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	eventID := uuid.New()
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM incidents WHERE id=$1)`, id).Scan(&exists); err != nil {
 			return fmt.Errorf("check incident: %w", err)
@@ -451,6 +461,7 @@ func (s *Store) AppendEvent(ctx context.Context, id uuid.UUID, in EventInput) er
 			return fmt.Errorf("touch incident: %w", err)
 		}
 		return appendEvent(ctx, tx, id, seq, Event{
+			ID:         eventID,
 			Type:       EventNote,
 			Category:   in.Category,
 			Source:     in.Source,
@@ -461,4 +472,8 @@ func (s *Store) AppendEvent(ctx context.Context, id uuid.UUID, in EventInput) er
 			ObservedAt: in.ObservedAt,
 		})
 	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return eventID, nil
 }

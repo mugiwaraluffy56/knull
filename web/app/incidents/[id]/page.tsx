@@ -136,6 +136,7 @@ export default function IncidentPage({
                   {e.source === "github" && <GitHubFinding event={e} />}
                   {e.source === "jev" && <JevClassification event={e} />}
                   {(e.source === "jev-next-action" || e.source === "jev-risk") && <JevDecision event={e} />}
+                  {e.source === "action-plan" && <ActionPlan event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -180,6 +181,19 @@ function JevDecision({ event }: { event: IncidentEvent }) {
     {Array.isArray(decision.evidence_ids) && decision.evidence_ids.length > 0 && <div>Evidence: {decision.evidence_ids.map((id, index) => <span key={id}>{index > 0 ? ", " : ""}<a href={`#event-${id}`}>{id.slice(0, 8)}</a></span>)}</div>}
     {decision.action_ref && <div>Proposed action: <a href={`#event-${decision.action_ref}`}>{decision.action_ref.slice(0, 8)}</a></div>}
     <div className="auth-muted">Recommendation only · production changes require approval.</div>
+  </div>;
+}
+
+function ActionPlan({ event }: { event: IncidentEvent }) {
+  const contract = event.data?.contract as { version?: string; type?: string; environment?: string; target?: { cluster?: string; namespace?: string; name?: string; container?: string }; field?: string; currentValue?: string; desiredValue?: string; expectedImpact?: string; risk?: string; evidenceIds?: string[]; digest?: string } | undefined;
+  if (!contract?.digest || !contract.target) return null;
+  return <div className="metric-finding">
+    <strong>Proposed action · {contract.type}</strong>
+    <div>{contract.target.cluster}/{contract.target.namespace}/{contract.target.name}{contract.target.container ? `/${contract.target.container}` : ""} · {contract.environment}</div>
+    <div>{contract.field}: <strong>{contract.currentValue}</strong> → <strong>{contract.desiredValue}</strong></div>
+    <div>Expected impact: {contract.expectedImpact} · risk: {contract.risk}</div>
+    {Array.isArray(contract.evidenceIds) && <div>Evidence: {contract.evidenceIds.map((id, index) => <span key={id}>{index > 0 ? ", " : ""}<a href={`#event-${id}`}>{id.slice(0, 8)}</a></span>)}</div>}
+    <div className="auth-muted">{contract.version} · digest {contract.digest.slice(0, 12)} · proposal only</div>
   </div>;
 }
 

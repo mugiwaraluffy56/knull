@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mugiwaraluffy56/knull/backend/internal/actions"
 	"github.com/mugiwaraluffy56/knull/backend/internal/alerts"
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/classify"
@@ -162,6 +163,7 @@ func run(logger *slog.Logger) error {
 			Workflow:       workflowStarterOrNil(workflowManager),
 			Collector:      collectorOrNil(collector),
 			Classifier:     classifier,
+			ActionPlanner:  actions.NewService(incidentStore, serviceStore),
 			AlertIntake:    alertIntake,
 			AlertFailures:  alertFailures,
 			AlertSecret:    cfg.AlertmanagerSecret,

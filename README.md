@@ -128,6 +128,10 @@ For supported hypotheses, Jev also suggests the next response step. The API
 records that decision and may enter planning, but no recommendation can approve
 or run a production change. Risk classification requires a stored proposed
 action and leaves the incident in planning.
+An authenticated operator can record a scoped proposal with
+`POST /api/incidents/{id}/plans`. The backend seals an `action-v1` contract with
+a digest, exact target and preconditions, and evidence links. The incident
+timeline renders its before/after values from that contract.
 
 ### What Jev decides
 

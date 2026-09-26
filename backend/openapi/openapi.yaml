@@ -423,6 +423,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/incidents/{id}/plans:
+    post:
+      operationId: createActionPlan
+      summary: Record a bounded remediation proposal
+      description: Seals a versioned action scoped to the incident service mapping and stored evidence. Does not execute it.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionDraft"
+      responses:
+        "201":
+          description: Sealed action proposal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedActionPlan"
+        "400":
+          description: Invalid action or scope.
+        "401":
+          description: Authentication required.
+        "404":
+          description: Incident not found.
+        "503":
+          description: Action planning unavailable.
 components:
   parameters:
     ServiceId:
@@ -440,6 +468,55 @@ components:
         type: string
         format: uuid
   schemas:
+    ActionTarget:
+      type: object
+      required: [cluster, namespace, kind, name]
+      properties:
+        cluster: { type: string }
+        namespace: { type: string }
+        kind: { type: string, enum: [Deployment] }
+        name: { type: string }
+        container: { type: string }
+    ActionPreconditions:
+      type: object
+      required: [resourceUid, resourceVersion, currentValue]
+      properties:
+        resourceUid: { type: string, format: uuid }
+        resourceVersion: { type: string }
+        currentValue: { type: string }
+    ActionDraft:
+      type: object
+      required: [type, environment, target, field, currentValue, desiredValue, preconditions, expectedImpact, risk, evidenceIds]
+      properties:
+        type:
+          type: string
+          enum: [RESTART_WORKLOAD, SCALE_REPLICAS, ADJUST_CPU, ADJUST_MEMORY, ROLLBACK_DEPLOYMENT]
+        environment: { type: string }
+        target: { $ref: "#/components/schemas/ActionTarget" }
+        field: { type: string }
+        currentValue: { type: string }
+        desiredValue: { type: string }
+        preconditions: { $ref: "#/components/schemas/ActionPreconditions" }
+        expectedImpact: { type: string }
+        risk: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        evidenceIds:
+          type: array
+          items: { type: string, format: uuid }
+    ActionContract:
+      allOf:
+        - $ref: "#/components/schemas/ActionDraft"
+        - type: object
+          required: [version, digest]
+          properties:
+            version: { type: string, enum: [action-v1] }
+            digest: { type: string }
+    CreatedActionPlan:
+      type: object
+      required: [eventId, contract, summary]
+      properties:
+        eventId: { type: string, format: uuid }
+        contract: { $ref: "#/components/schemas/ActionContract" }
+        summary: { type: string }
     HealthStatus:
       type: object
       required:

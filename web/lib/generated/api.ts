@@ -291,10 +291,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidents/{id}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a bounded remediation proposal
+         * @description Seals a versioned action scoped to the incident service mapping and stored evidence. Does not execute it.
+         */
+        post: operations["createActionPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActionTarget: {
+            cluster: string;
+            namespace: string;
+            /** @enum {string} */
+            kind: "Deployment";
+            name: string;
+            container?: string;
+        };
+        ActionPreconditions: {
+            /** Format: uuid */
+            resourceUid: string;
+            resourceVersion: string;
+            currentValue: string;
+        };
+        ActionDraft: {
+            /** @enum {string} */
+            type: "RESTART_WORKLOAD" | "SCALE_REPLICAS" | "ADJUST_CPU" | "ADJUST_MEMORY" | "ROLLBACK_DEPLOYMENT";
+            environment: string;
+            target: components["schemas"]["ActionTarget"];
+            field: string;
+            currentValue: string;
+            desiredValue: string;
+            preconditions: components["schemas"]["ActionPreconditions"];
+            expectedImpact: string;
+            /** @enum {string} */
+            risk: "LOW" | "MEDIUM" | "HIGH";
+            evidenceIds: string[];
+        };
+        ActionContract: components["schemas"]["ActionDraft"] & {
+            /** @enum {string} */
+            version: "action-v1";
+            digest: string;
+        };
+        CreatedActionPlan: {
+            /** Format: uuid */
+            eventId: string;
+            contract: components["schemas"]["ActionContract"];
+            summary: string;
+        };
         HealthStatus: {
             /**
              * @description Overall health of the service.
@@ -1084,6 +1143,60 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    createActionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionDraft"];
+            };
+        };
+        responses: {
+            /** @description Sealed action proposal. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedActionPlan"];
+                };
+            };
+            /** @description Invalid action or scope. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Action planning unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
