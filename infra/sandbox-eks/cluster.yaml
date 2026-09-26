@@ -1,0 +1,35 @@
+# Dedicated, temporary Knull sandbox. Never reuse a production cluster.
+# Creating this file's resources incurs AWS charges; see README.md first.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: knull-sandbox
+  region: ap-south-1
+  tags:
+    Project: knull
+    Purpose: isolated-validation
+vpc:
+  nat:
+    gateway: Single
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+iam:
+  withOIDC: true
+addons:
+  - name: vpc-cni
+    configurationValues: |-
+      {
+        "enableNetworkPolicy": "true",
+        "env": {"NETWORK_POLICY_ENFORCING_MODE": "strict"}
+      }
+managedNodeGroups:
+  - name: sandbox-workers
+    instanceType: m5.large
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    volumeSize: 20
+    privateNetworking: true
+    ssh:
+      allow: false
