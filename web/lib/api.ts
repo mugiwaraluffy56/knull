@@ -245,6 +245,15 @@ export type ActionContract = components["schemas"]["ActionContract"];
 export type ActionDecision = components["schemas"]["ActionDecision"];
 export type MemoryValidationResult = components["schemas"]["MemoryValidationResult"];
 
+export async function incidentOperation(id: string, operation: "close" | "escalate" | "recovery/verify", expectedVersion?: number, reason = ""): Promise<string | null> {
+	try {
+		const res = await fetch(`${API_BASE_URL}/api/incidents/${id}/${operation}`, {method: "POST", credentials: "include", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify({expectedVersion, reason})});
+		if (res.ok) return null;
+		const body = await res.json() as {error?: string};
+		return body.error ?? `request failed (${res.status})`;
+	} catch (err) { return err instanceof Error ? err.message : "request failed"; }
+}
+
 export interface ActionDecisionResult {
   decision?: ActionDecision;
   error?: string;

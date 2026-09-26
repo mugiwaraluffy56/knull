@@ -7,6 +7,7 @@ import {
   collectEvidence,
   fetchIncident,
   fetchIncidentEvents,
+	incidentOperation,
   type Incident,
   type IncidentEvent,
 } from "@/lib/api";
@@ -25,6 +26,18 @@ export default function IncidentPage({
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
+	const [resolutionReason, setResolutionReason] = useState("");
+	const [resolutionMessage, setResolutionMessage] = useState<string | null>(null);
+	const [resolving, setResolving] = useState(false);
+	const operate = async (operation: "close" | "escalate" | "recovery/verify") => {
+		if (!incident || resolving) return;
+		setResolving(true);
+		const error = await incidentOperation(incident.id, operation, incident.version, resolutionReason.trim());
+		setResolutionMessage(error ?? (operation === "recovery/verify" ? "Recovery assessment recorded" : "Incident updated"));
+		if (!error) setResolutionReason("");
+		await load();
+		setResolving(false);
+	};
 
   const load = useCallback(async () => {
     const [inc, evs] = await Promise.all([
@@ -109,6 +122,18 @@ export default function IncidentPage({
         </div>
 
         <ApprovalReview incident={incident} events={events} onRefresh={load} />
+		{incident.state !== "CLOSED" && <section className="incident-resolution" aria-label="Incident resolution">
+			<h2>Resolution</h2>
+			<p>Recovery requires a full live observation window. Other outcomes stay open for operator review.</p>
+			<label htmlFor="resolution-reason">Operator reason</label>
+			<textarea id="resolution-reason" value={resolutionReason} onChange={event => setResolutionReason(event.target.value)} maxLength={500} rows={2} placeholder="Reason for escalation or manual closure" />
+			<div className="incident-actions">
+				{incident.state === "VERIFYING" && <button className="btn" disabled={resolving} onClick={() => operate("recovery/verify")}>Verify recovery</button>}
+				{["INVESTIGATING","PLANNING","VALIDATING","AWAITING_APPROVAL","REMEDIATING","VERIFYING","FAILED"].includes(incident.state) && <button className="btn btn-ghost" disabled={resolving} onClick={() => operate("escalate")}>Escalate</button>}
+				{["RECEIVED","VERIFYING","RECOVERED","DENIED","ESCALATED","FAILED"].includes(incident.state) && <button className="btn btn-ghost" disabled={resolving || (incident.state === "VERIFYING" && !resolutionReason.trim())} onClick={() => operate("close")}>Close incident</button>}
+			</div>
+			{resolutionMessage && <p role="status">{resolutionMessage}</p>}
+		</section>}
 
         <h2 className="section-title">Timeline</h2>
         {events.length === 0 ? (
@@ -143,6 +168,7 @@ export default function IncidentPage({
                   {e.source === "sandbox" && <SandboxRun event={e} />}
                   {e.source === "sandbox-validation" && <SandboxValidation event={e} />}
                   {e.source === "approval" && <ApprovalDecision event={e} />}
+				  {e.source === "recovery-verifier" && <pre className="metric-query">{JSON.stringify(e.data?.result ?? {}, null, 2)}</pre>}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}

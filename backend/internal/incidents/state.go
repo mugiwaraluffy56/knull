@@ -32,7 +32,7 @@ var allowedTransitions = map[State][]State{
 	StateValidating:       {StateAwaitingApproval, StateEscalated, StateFailed},
 	StateAwaitingApproval: {StateRemediating, StateDenied, StatePlanning, StateEscalated},
 	StateRemediating:      {StateVerifying, StateEscalated, StateFailed},
-	StateVerifying:        {StateRecovered, StateEscalated, StateFailed},
+	StateVerifying:        {StateRecovered, StateEscalated, StateFailed, StateClosed},
 	StateRecovered:        {StateClosed},
 	StateDenied:           {StateEscalated, StateClosed},
 	StateEscalated:        {StateClosed},

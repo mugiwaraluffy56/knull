@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,7 +27,9 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
 	"github.com/mugiwaraluffy56/knull/backend/internal/investigate"
 	"github.com/mugiwaraluffy56/knull/backend/internal/mcp"
+	"github.com/mugiwaraluffy56/knull/backend/internal/operational"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
+	"github.com/mugiwaraluffy56/knull/backend/internal/recovery"
 	"github.com/mugiwaraluffy56/knull/backend/internal/recoverypolicy"
 	"github.com/mugiwaraluffy56/knull/backend/internal/respond"
 	"github.com/mugiwaraluffy56/knull/backend/internal/sandbox"
@@ -71,6 +74,20 @@ func run(logger *slog.Logger) error {
 	serviceStore := services.NewStore(st.Pool)
 	incidentStore := incidents.NewStore(st.Pool)
 	alertFailures := alerts.NewFailureStore(st.Pool)
+	monitor := &operational.Monitor{Deps: st, Incidents: incidentStore, Endpoints: map[string]operational.Endpoint{
+		"trueforge":      {URL: strings.TrimRight(cfg.TrueForgeURL, "/") + "/api/v1/models", Token: cfg.TrueForgeToken},
+		"kubernetes-mcp": {URL: cfg.K8sMCPURL, Token: cfg.K8sMCPToken},
+		"prometheus-mcp": {URL: cfg.PrometheusMCPURL, Token: cfg.PrometheusMCPToken},
+		"github-mcp":     {URL: cfg.GitHubMCPURL, Token: cfg.GitHubMCPToken},
+		"jev":            {URL: cfg.JevMCPURL},
+	}}
+	if cfg.TrueForgeURL == "" {
+		monitor.Endpoints["trueforge"] = operational.Endpoint{}
+	}
+	if cfg.SandboxKubeconfig != "" {
+		monitor.Sandbox = sandbox.Kubectl{Kubeconfig: cfg.SandboxKubeconfig, Context: cfg.SandboxContext}
+		monitor.ExpectedSandboxUID = cfg.SandboxClusterUID
+	}
 	alertIntake := alerts.NewIntake(incidentStore, serviceStore, alertFailures, alerts.LabelMapping{
 		ServiceLabel:     cfg.AlertServiceLabel,
 		EnvironmentLabel: cfg.AlertEnvironmentLabel,
@@ -152,7 +169,9 @@ func run(logger *slog.Logger) error {
 	}
 	secretStore := secrets.NewStore(st.Pool, cipher)
 	approvalService := approval.NewService(st.Pool)
+	recoveryPolicies := recoverypolicy.NewStore(st.Pool)
 	var productionExecutor *executor.Service
+	var recoveryService *recovery.Service
 	if cfg.ProductionExecutionEnabled {
 		client, err := executor.InCluster(cfg.ProductionCluster, cfg.ProductionNamespace, cfg.ProductionWorkload, cfg.ProductionCASHA256)
 		if err != nil {
@@ -160,6 +179,9 @@ func run(logger *slog.Logger) error {
 		}
 		productionExecutor = &executor.Service{Gate: approvalService, Client: client, History: incidentStore}
 		logger.Info("production memory executor enabled", "cluster", cfg.ProductionCluster, "namespace", cfg.ProductionNamespace, "workload", cfg.ProductionWorkload)
+		if cfg.JevMCPURL != "" && cfg.ProductionPrometheusURL != "" && cfg.ProductionErrorRateQuery != "" && cfg.ProductionP95Query != "" {
+			recoveryService = &recovery.Service{History: incidentStore, Policies: recoveryPolicies, Observer: recovery.LiveObserver{Kubernetes: client.Client, Cluster: cfg.ProductionCluster, Namespace: cfg.ProductionNamespace, Workload: cfg.ProductionWorkload, PrometheusURL: cfg.ProductionPrometheusURL, PrometheusToken: cfg.ProductionPrometheusToken, ErrorRateQuery: cfg.ProductionErrorRateQuery, LatencyP95Query: cfg.ProductionP95Query}, Jev: &classify.MCPClient{Endpoint: cfg.JevMCPURL}}
+		}
 	}
 
 	var authn *auth.Authenticator
@@ -180,31 +202,34 @@ func run(logger *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Options{
-			Deps:             st,
-			AllowedOrigin:    cfg.AllowedOrigin,
-			HealthTimeout:    cfg.HealthTimeout,
-			Sessions:         sessions,
-			Authn:            authn,
-			Operators:        operatorStore,
-			Secrets:          secretStore,
-			Services:         serviceStore,
-			RecoveryPolicies: recoverypolicy.NewStore(st.Pool),
-			Incidents:        incidentStore,
-			FleetIncidents:   incidentStore,
-			Workflow:         workflowStarterOrNil(workflowManager),
-			Collector:        collectorOrNil(collector),
-			Classifier:       classifier,
-			ActionPlanner:    actions.NewService(incidentStore, serviceStore),
-			Approvals:        approvalService,
-			Executor:         productionExecutor,
-			Sandbox:          sandboxService,
-			MemoryValidator:  memoryValidator,
-			AlertIntake:      alertIntake,
-			AlertFailures:    alertFailures,
-			AlertSecret:      cfg.AlertmanagerSecret,
-			AppBaseURL:       cfg.AppBaseURL,
-			UIBaseURL:        cfg.UIBaseURL,
-			Logger:           logger,
+			Deps:              st,
+			AllowedOrigin:     cfg.AllowedOrigin,
+			HealthTimeout:     cfg.HealthTimeout,
+			Sessions:          sessions,
+			Authn:             authn,
+			Operators:         operatorStore,
+			Secrets:           secretStore,
+			Services:          serviceStore,
+			RecoveryPolicies:  recoveryPolicies,
+			RecoveryVerifier:  recoveryService,
+			Resolutions:       incidentStore,
+			IntegrationHealth: monitor,
+			Incidents:         incidentStore,
+			FleetIncidents:    incidentStore,
+			Workflow:          workflowStarterOrNil(workflowManager),
+			Collector:         collectorOrNil(collector),
+			Classifier:        classifier,
+			ActionPlanner:     actions.NewService(incidentStore, serviceStore),
+			Approvals:         approvalService,
+			Executor:          productionExecutor,
+			Sandbox:           sandboxService,
+			MemoryValidator:   memoryValidator,
+			AlertIntake:       alertIntake,
+			AlertFailures:     alertFailures,
+			AlertSecret:       cfg.AlertmanagerSecret,
+			AppBaseURL:        cfg.AppBaseURL,
+			UIBaseURL:         cfg.UIBaseURL,
+			Logger:            logger,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

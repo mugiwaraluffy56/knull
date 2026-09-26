@@ -1,0 +1,164 @@
+{{- $name := .Release.Name -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $apiImage := required "api.image is required" .Values.api.image -}}
+{{- $webImage := required "web.image is required" .Values.web.image -}}
+{{- $jevImage := required "jev.image is required" .Values.jev.image -}}
+{{- $apiSecret := required "api.envSecretName is required" .Values.api.envSecretName -}}
+{{- $jevSecret := required "jev.envSecretName is required" .Values.jev.envSecretName -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-api
+automountServiceAccountToken: {{ .Values.production.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-jev
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-web
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app.kubernetes.io/name: knull-api, app.kubernetes.io/instance: {{ $name }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: knull-api, app.kubernetes.io/instance: {{ $name }}}
+    spec:
+      serviceAccountName: {{ $name }}-api
+      automountServiceAccountToken: {{ .Values.production.enabled }}
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: api
+          image: {{ $apiImage | quote }}
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080, name: http}]
+          envFrom: [{secretRef: {name: {{ $apiSecret }}}}]
+          env:
+            - {name: KNULL_HTTP_ADDR, value: ":8080"}
+            - {name: KNULL_JEV_MCP_URL, value: "http://{{ $name }}-jev:8090"}
+            {{- if .Values.sandbox.kubeconfigSecretName }}
+            - {name: KNULL_SANDBOX_KUBECONFIG, value: "/etc/knull/sandbox/kubeconfig"}
+            {{- end }}
+          {{- if .Values.sandbox.kubeconfigSecretName }}
+          volumeMounts:
+            - {name: sandbox-kubeconfig, mountPath: /etc/knull/sandbox, readOnly: true}
+          {{- end }}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 20}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+      {{- if .Values.sandbox.kubeconfigSecretName }}
+      volumes:
+        - name: sandbox-kubeconfig
+          secret:
+            secretName: {{ .Values.sandbox.kubeconfigSecretName }}
+            items: [{key: kubeconfig, path: kubeconfig}]
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-api
+spec:
+  selector: {app.kubernetes.io/name: knull-api, app.kubernetes.io/instance: {{ $name }}}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-jev
+spec:
+  replicas: {{ .Values.jev.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: knull-jev, app.kubernetes.io/instance: {{ $name }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: knull-jev, app.kubernetes.io/instance: {{ $name }}}
+    spec:
+      serviceAccountName: {{ $name }}-jev
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: jev
+          image: {{ $jevImage | quote }}
+          command: [/usr/local/bin/knull-jev-mcp]
+          ports: [{containerPort: 8090, name: http}]
+          envFrom: [{secretRef: {name: {{ $jevSecret }}}}]
+          env: [{name: KNULL_JEV_ADDR, value: ":8090"}]
+          readinessProbe: {tcpSocket: {port: http}, periodSeconds: 10}
+          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-jev
+spec:
+  selector: {app.kubernetes.io/name: knull-jev, app.kubernetes.io/instance: {{ $name }}}
+  ports: [{name: http, port: 8090, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-web
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: knull-web, app.kubernetes.io/instance: {{ $name }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: knull-web, app.kubernetes.io/instance: {{ $name }}}
+    spec:
+      serviceAccountName: {{ $name }}-web
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: web
+          image: {{ $webImage | quote }}
+          ports: [{containerPort: 3000, name: http}]
+          readinessProbe: {httpGet: {path: /, port: http}, periodSeconds: 10}
+          resources: {requests: {cpu: 50m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-web
+spec:
+  selector: {app.kubernetes.io/name: knull-web, app.kubernetes.io/instance: {{ $name }}}
+  ports: [{name: http, port: 3000, targetPort: http}]
+{{- if .Values.production.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-production-executor
+  namespace: {{ required "production.targetNamespace is required" .Values.production.targetNamespace }}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [{{ required "production.workload is required" .Values.production.workload }}]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-production-executor
+  namespace: {{ .Values.production.targetNamespace }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-production-executor}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}-api, namespace: {{ $namespace }}}
+{{- end }}

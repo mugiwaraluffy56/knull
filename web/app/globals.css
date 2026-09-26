@@ -385,6 +385,11 @@ code {
 .metric-query { display: block; margin-top: 4px; color: var(--muted); white-space: pre-wrap; }
 
 .incident-actions { margin: 14px 0; }
+.incident-resolution { margin: 24px 0; padding: 20px; border: 1px solid var(--border); border-radius: 14px; }
+.incident-resolution h2 { margin: 0 0 8px; }
+.incident-resolution p { color: var(--muted); }
+.incident-resolution label { display: block; margin: 16px 0 7px; }
+.incident-resolution textarea { width: 100%; min-height: 60px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; }
 
 /* Action review: dark canvas, white primary pill, and compact audit detail. */
 .incident-page-card { max-width: 1000px; }

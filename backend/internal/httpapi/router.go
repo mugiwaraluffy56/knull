@@ -30,60 +30,66 @@ type secretStore interface {
 
 // Options bundles the dependencies used to build a Server.
 type Options struct {
-	Deps             dependencyChecker
-	AllowedOrigin    string
-	HealthTimeout    time.Duration
-	Sessions         *auth.SessionManager
-	Authn            *auth.Authenticator // nil when OIDC is not configured/reachable
-	Operators        operatorStore
-	Secrets          secretStore
-	Services         serviceStore
-	RecoveryPolicies recoveryPolicyStore
-	Incidents        incidentStore
-	FleetIncidents   fleetIncidentSource
-	Workflow         workflowStarter
-	Collector        evidenceCollector
-	Classifier       incidentClassifier
-	ActionPlanner    actionPlanner
-	Approvals        approvalDecider
-	Executor         productionExecutor
-	Sandbox          sandboxPreparer
-	MemoryValidator  memoryValidator
-	AlertIntake      alertIntake
-	AlertFailures    failureRecorder
-	AlertSecret      string
-	AppBaseURL       string
-	UIBaseURL        string
-	Logger           *slog.Logger
+	Deps              dependencyChecker
+	AllowedOrigin     string
+	HealthTimeout     time.Duration
+	Sessions          *auth.SessionManager
+	Authn             *auth.Authenticator // nil when OIDC is not configured/reachable
+	Operators         operatorStore
+	Secrets           secretStore
+	Services          serviceStore
+	RecoveryPolicies  recoveryPolicyStore
+	RecoveryVerifier  recoveryVerifier
+	Resolutions       resolutionStore
+	IntegrationHealth integrationHealth
+	Incidents         incidentStore
+	FleetIncidents    fleetIncidentSource
+	Workflow          workflowStarter
+	Collector         evidenceCollector
+	Classifier        incidentClassifier
+	ActionPlanner     actionPlanner
+	Approvals         approvalDecider
+	Executor          productionExecutor
+	Sandbox           sandboxPreparer
+	MemoryValidator   memoryValidator
+	AlertIntake       alertIntake
+	AlertFailures     failureRecorder
+	AlertSecret       string
+	AppBaseURL        string
+	UIBaseURL         string
+	Logger            *slog.Logger
 }
 
 // Server holds the dependencies needed to serve HTTP requests.
 type Server struct {
-	deps             dependencyChecker
-	allowedOrigin    string
-	healthTimeout    time.Duration
-	sessions         *auth.SessionManager
-	authn            *auth.Authenticator
-	operators        operatorStore
-	secrets          secretStore
-	services         serviceStore
-	recoveryPolicies recoveryPolicyStore
-	incidents        incidentStore
-	fleetIncidents   fleetIncidentSource
-	workflow         workflowStarter
-	collector        evidenceCollector
-	classifier       incidentClassifier
-	actionPlanner    actionPlanner
-	approvals        approvalDecider
-	executor         productionExecutor
-	sandbox          sandboxPreparer
-	memoryValidator  memoryValidator
-	alertIntake      alertIntake
-	alertFailures    failureRecorder
-	alertSecret      string
-	appBaseURL       string
-	uiBaseURL        string
-	logger           *slog.Logger
+	deps              dependencyChecker
+	allowedOrigin     string
+	healthTimeout     time.Duration
+	sessions          *auth.SessionManager
+	authn             *auth.Authenticator
+	operators         operatorStore
+	secrets           secretStore
+	services          serviceStore
+	recoveryPolicies  recoveryPolicyStore
+	recoveryVerifier  recoveryVerifier
+	resolutions       resolutionStore
+	integrationHealth integrationHealth
+	incidents         incidentStore
+	fleetIncidents    fleetIncidentSource
+	workflow          workflowStarter
+	collector         evidenceCollector
+	classifier        incidentClassifier
+	actionPlanner     actionPlanner
+	approvals         approvalDecider
+	executor          productionExecutor
+	sandbox           sandboxPreparer
+	memoryValidator   memoryValidator
+	alertIntake       alertIntake
+	alertFailures     failureRecorder
+	alertSecret       string
+	appBaseURL        string
+	uiBaseURL         string
+	logger            *slog.Logger
 }
 
 // New builds a Server from Options, applying safe defaults.
@@ -95,31 +101,34 @@ func New(opts Options) *Server {
 		opts.Logger = slog.Default()
 	}
 	return &Server{
-		deps:             opts.Deps,
-		allowedOrigin:    opts.AllowedOrigin,
-		healthTimeout:    opts.HealthTimeout,
-		sessions:         opts.Sessions,
-		authn:            opts.Authn,
-		operators:        opts.Operators,
-		secrets:          opts.Secrets,
-		services:         opts.Services,
-		recoveryPolicies: opts.RecoveryPolicies,
-		incidents:        opts.Incidents,
-		fleetIncidents:   opts.FleetIncidents,
-		workflow:         opts.Workflow,
-		collector:        opts.Collector,
-		classifier:       opts.Classifier,
-		actionPlanner:    opts.ActionPlanner,
-		approvals:        opts.Approvals,
-		executor:         opts.Executor,
-		sandbox:          opts.Sandbox,
-		memoryValidator:  opts.MemoryValidator,
-		alertIntake:      opts.AlertIntake,
-		alertFailures:    opts.AlertFailures,
-		alertSecret:      opts.AlertSecret,
-		appBaseURL:       opts.AppBaseURL,
-		uiBaseURL:        opts.UIBaseURL,
-		logger:           opts.Logger,
+		deps:              opts.Deps,
+		allowedOrigin:     opts.AllowedOrigin,
+		healthTimeout:     opts.HealthTimeout,
+		sessions:          opts.Sessions,
+		authn:             opts.Authn,
+		operators:         opts.Operators,
+		secrets:           opts.Secrets,
+		services:          opts.Services,
+		recoveryPolicies:  opts.RecoveryPolicies,
+		recoveryVerifier:  opts.RecoveryVerifier,
+		resolutions:       opts.Resolutions,
+		integrationHealth: opts.IntegrationHealth,
+		incidents:         opts.Incidents,
+		fleetIncidents:    opts.FleetIncidents,
+		workflow:          opts.Workflow,
+		collector:         opts.Collector,
+		classifier:        opts.Classifier,
+		actionPlanner:     opts.ActionPlanner,
+		approvals:         opts.Approvals,
+		executor:          opts.Executor,
+		sandbox:           opts.Sandbox,
+		memoryValidator:   opts.MemoryValidator,
+		alertIntake:       opts.AlertIntake,
+		alertFailures:     opts.AlertFailures,
+		alertSecret:       opts.AlertSecret,
+		appBaseURL:        opts.AppBaseURL,
+		uiBaseURL:         opts.UIBaseURL,
+		logger:            opts.Logger,
 	}
 }
 
@@ -140,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	// Operator-only endpoints.
 	mux.Handle("GET /api/me", s.requireOperator(http.HandlerFunc(s.handleMe)))
 	mux.Handle("GET /api/integrations/credentials", s.requireOperator(http.HandlerFunc(s.handleListCredentials)))
+	mux.Handle("GET /api/integrations/health", s.requireOperator(http.HandlerFunc(s.handleIntegrationHealth)))
 	mux.Handle("PUT /api/integrations/credentials", s.requireOperator(http.HandlerFunc(s.handlePutCredential)))
 
 	mux.Handle("GET /api/services", s.requireOperator(http.HandlerFunc(s.handleListServices)))
@@ -164,6 +174,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/incidents/{id}/denials", s.requireOperator(http.HandlerFunc(s.handleDenyAction)))
 	mux.Handle("POST /api/incidents/{id}/executions/memory", s.requireOperator(http.HandlerFunc(s.handleExecuteMemory)))
 	mux.Handle("POST /api/incidents/{id}/executions/memory/reconcile", s.requireOperator(http.HandlerFunc(s.handleReconcileMemory)))
+	mux.Handle("POST /api/incidents/{id}/recovery/verify", s.requireOperator(http.HandlerFunc(s.handleVerifyRecovery)))
+	mux.Handle("POST /api/incidents/{id}/close", s.requireOperator(http.HandlerFunc(s.handleCloseIncident)))
+	mux.Handle("POST /api/incidents/{id}/escalate", s.requireOperator(http.HandlerFunc(s.handleEscalateIncident)))
 
 	return s.withCORS(mux)
 }

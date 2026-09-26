@@ -41,6 +41,14 @@ func (c *MCPClient) ClassifyRisk(ctx context.Context, input jev.Input) (jev.Risk
 	return decision, nil
 }
 
+func (c *MCPClient) VerifyRecovery(ctx context.Context, input jev.Input) (jev.RecoveryResult, error) {
+	var decision jev.RecoveryResult
+	if err := c.call(ctx, "verify_recovery", input, &decision); err != nil {
+		return jev.RecoveryResult{}, err
+	}
+	return decision, nil
+}
+
 func (c *MCPClient) call(ctx context.Context, name string, input jev.Input, out any) error {
 	client := mcp.NewClient(&mcp.Implementation{Name: "knull-backend", Version: "1"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: c.Endpoint, HTTPClient: c.HTTPClient, DisableStandaloneSSE: true, MaxRetries: -1}, nil)

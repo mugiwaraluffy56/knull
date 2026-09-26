@@ -71,6 +71,11 @@ func run(args []string, out io.Writer) error {
 			return usage()
 		}
 		method, path = http.MethodGet, "/api/integrations/credentials"
+	case "health":
+		if len(parts) != 1 {
+			return usage()
+		}
+		method, path = http.MethodGet, "/api/integrations/health"
 	case "incidents":
 		if len(parts) != 1 {
 			return usage()
@@ -182,5 +187,5 @@ func envOr(name, fallback string) string {
 }
 
 func usage() error {
-	return errors.New("usage: knullctl [--api URL] [--json] check|services|integrations|incidents|incident UUID|events UUID|start SERVICE_UUID SUMMARY")
+	return errors.New("usage: knullctl [--api URL] [--json] check|health|services|integrations|incidents|incident UUID|events UUID|start SERVICE_UUID SUMMARY")
 }

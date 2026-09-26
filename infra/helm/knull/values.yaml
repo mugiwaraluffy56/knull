@@ -1,0 +1,22 @@
+api:
+  image: ""
+  envSecretName: ""
+  replicas: 1
+web:
+  image: ""
+  replicas: 1
+jev:
+  image: ""
+  envSecretName: ""
+  replicas: 1
+sandbox:
+  kubeconfigSecretName: ""
+production:
+  enabled: false
+  targetNamespace: ""
+  workload: ""
+ingress:
+  enabled: false
+  className: ""
+  apiHost: ""
+  webHost: ""

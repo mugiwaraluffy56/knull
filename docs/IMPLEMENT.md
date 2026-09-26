@@ -389,7 +389,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - The incident timeline shows TrueForge execute the generated validation code in the sandbox and records its result alongside independent workload and metric observations.
 - Failed, incomplete, or unavailable validation cannot become eligible for production approval.
 
-**Completion:** [ ] Gate, pod/Prometheus readers, TrueForge API client, and representative workload pushed. Live EKS `256Mi` OOM and `1Gi` 20/20 request runs passed with cleanup; TrueForge code execution, sandbox-only connector isolation, and live Prometheus observations remain pending. PR/commits: 88578a2, 86dead3, fc45e7a, f03f36e, f6f0b00, b95218c
+**Completion:** [x] Implementation accepted by project owner with the remaining live verification waived. Gate, pod/Prometheus readers, TrueForge API client, and representative workload pushed. Live EKS `256Mi` OOM and `1Gi` 20/20 request runs passed with cleanup; TrueForge code execution, sandbox-only connector isolation, and live Prometheus observations were not verified. PR/commits: 88578a2, 86dead3, fc45e7a, f03f36e, f6f0b00, b95218c
 
 ### 19. Enforce action-specific approval
 

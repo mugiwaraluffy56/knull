@@ -7,11 +7,17 @@ Monitoring tells you that production is broken. Knull works out why. It tests a
 fix, then puts production one click away from recovery.
 
 > [!NOTE]
-> Knull is in design. The product brief is in [`docs/PRD.md`](docs/PRD.md),
-> the detailed behavior and architecture are in [`docs/SPEC.md`](docs/SPEC.md),
-> and the implementation checklist is in
-> [`docs/IMPLEMENT.md`](docs/IMPLEMENT.md). The application code is not written
-> yet, so this README describes the agreed implementation plan.
+> Knull is under active implementation. The product brief is in
+> [`docs/PRD.md`](docs/PRD.md), the architecture in [`docs/SPEC.md`](docs/SPEC.md),
+> and tracked implementation and verification status in
+> [`docs/IMPLEMENT.md`](docs/IMPLEMENT.md). The memory scenario has been exercised
+> in EKS, but the complete live TrueForge and production recovery demo has not
+> passed end to end.
+
+The backend and web containers are in `backend/Dockerfile` and `web/Dockerfile`.
+The customer EKS chart is in `infra/helm/knull`; it requires customer-owned
+secrets and image references. `docs/operator-cli.md` describes `knullctl`.
+AI assistants used during development: Claude and OpenAI Codex.
 
 ## Why this matters
 
