@@ -115,7 +115,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Repeated deliveries attach to the active incident rather than creating duplicate investigations.
 - Invalid signatures and malformed payloads are rejected and leave an auditable intake result.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: facc402
+**Completion:** [x] Code pushed; verification passes. PR/commit: e6c21cf
 
 ### 6. Let operators start investigations
 
