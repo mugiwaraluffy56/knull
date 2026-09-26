@@ -192,3 +192,38 @@ export async function setServiceEnabled(
     body: JSON.stringify({ enabled }),
   });
 }
+
+export type Incident = components["schemas"]["Incident"];
+
+export interface StartInvestigationResult {
+  ok: boolean;
+  incident?: Incident;
+  error?: string;
+  activeIncidentId?: string;
+}
+
+// startInvestigation opens an operator-initiated incident for a service. On a
+// duplicate-active conflict it returns the existing incident id so the UI can
+// point at it.
+export async function startInvestigation(input: {
+  serviceId: string;
+  summary: string;
+  force?: boolean;
+}): Promise<StartInvestigationResult> {
+  const res = await fetch(`${API_BASE_URL}/api/incidents`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.ok) return { ok: true, incident: (await res.json()) as Incident };
+  try {
+    const body = (await res.json()) as {
+      error?: string;
+      activeIncidentId?: string;
+    };
+    return { ok: false, error: body.error, activeIncidentId: body.activeIncidentId };
+  } catch {
+    return { ok: false, error: `request failed (${res.status})` };
+  }
+}

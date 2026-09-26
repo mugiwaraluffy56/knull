@@ -119,6 +119,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PATCH /api/services/{id}/enabled", s.requireOperator(http.HandlerFunc(s.handleSetServiceEnabled)))
 
 	mux.Handle("GET /api/incidents", s.requireOperator(http.HandlerFunc(s.handleListIncidents)))
+	mux.Handle("POST /api/incidents", s.requireOperator(http.HandlerFunc(s.handleStartInvestigation)))
 	mux.Handle("GET /api/incidents/{id}", s.requireOperator(http.HandlerFunc(s.handleGetIncident)))
 	mux.Handle("GET /api/incidents/{id}/events", s.requireOperator(http.HandlerFunc(s.handleListIncidentEvents)))
 

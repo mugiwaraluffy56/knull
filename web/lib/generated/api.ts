@@ -211,7 +211,8 @@ export interface paths {
         /** List incidents */
         get: operations["listIncidents"];
         put?: never;
-        post?: never;
+        /** Start an operator-initiated investigation */
+        post: operations["startInvestigation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -832,6 +833,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    startInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    serviceId: string;
+                    summary: string;
+                    symptoms?: {
+                        [key: string]: string;
+                    };
+                    force?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Incident opened. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Incident"];
+                };
+            };
+            /** @description Invalid request or unknown service. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An active investigation already exists for this service. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

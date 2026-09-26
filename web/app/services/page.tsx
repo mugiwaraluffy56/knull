@@ -6,6 +6,7 @@ import {
   listServices,
   loginURL,
   setServiceEnabled,
+  startInvestigation,
   updateService,
   type Service,
   type ServiceInput,
@@ -79,6 +80,9 @@ export default function ServicesPage() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [startFor, setStartFor] = useState<Service | null>(null);
+  const [startSummary, setStartSummary] = useState("");
+  const [startMsg, setStartMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await listServices();
@@ -141,6 +145,28 @@ export default function ServicesPage() {
   async function toggle(svc: Service) {
     await setServiceEnabled(svc.id, !svc.enabled);
     await load();
+  }
+
+  async function submitStart(force: boolean) {
+    if (!startFor) return;
+    const res = await startInvestigation({
+      serviceId: startFor.id,
+      summary: startSummary,
+      force,
+    });
+    if (res.ok && res.incident) {
+      setStartMsg(`Investigation started — incident ${res.incident.id}`);
+      setStartFor(null);
+      setStartSummary("");
+      return;
+    }
+    if (res.activeIncidentId) {
+      setStartMsg(
+        `Already active: incident ${res.activeIncidentId}. Use "Start anyway" to force a new one.`,
+      );
+      return;
+    }
+    setStartMsg(res.error ?? "failed to start");
   }
 
   if (authenticated === null) {
@@ -218,6 +244,43 @@ export default function ServicesPage() {
         </form>
         {error && <p className="error">{error}</p>}
 
+        {startFor && (
+          <div className="start-panel">
+            <strong>Start investigation — {startFor.displayName}</strong>
+            <textarea
+              value={startSummary}
+              placeholder="What is happening? (summary)"
+              onChange={(e) => setStartSummary(e.target.value)}
+            />
+            <div className="svc-form-actions">
+              <button
+                className="btn"
+                onClick={() => submitStart(false)}
+                disabled={!startSummary.trim()}
+              >
+                Start
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => submitStart(true)}
+                disabled={!startSummary.trim()}
+              >
+                Start anyway
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setStartFor(null);
+                  setStartMsg(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {startMsg && <p className="subtitle">{startMsg}</p>}
+
         <table className="cred-table">
           <thead>
             <tr>
@@ -264,6 +327,18 @@ export default function ServicesPage() {
                     <button className="btn btn-ghost" onClick={() => toggle(svc)}>
                       {svc.enabled ? "Disable" : "Enable"}
                     </button>
+                    {svc.enabled && (
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          setStartFor(svc);
+                          setStartMsg(null);
+                          setStartSummary("");
+                        }}
+                      >
+                        Start incident
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

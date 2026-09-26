@@ -298,6 +298,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    post:
+      operationId: startInvestigation
+      summary: Start an operator-initiated investigation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serviceId, summary]
+              properties:
+                serviceId:
+                  type: string
+                  format: uuid
+                summary:
+                  type: string
+                symptoms:
+                  type: object
+                  additionalProperties:
+                    type: string
+                force:
+                  type: boolean
+      responses:
+        "201":
+          description: Incident opened.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          description: Invalid request or unknown service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: An active investigation already exists for this service.
   /api/incidents/{id}:
     get:
       operationId: getIncident
