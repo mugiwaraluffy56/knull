@@ -8,15 +8,23 @@ any production kubeconfig or copy production Secrets or data into it.
 
 ## Before creation
 
-An AWS account with billing enabled and an AWS identity allowed to create
-EKS, IAM, VPC, EC2, and CloudFormation resources are required. Use a named
-AWS CLI profile and verify the account and region before creating anything:
+An AWS account with billing enabled and a non-root IAM or SSO identity allowed
+to create EKS, IAM, VPC, EC2, and CloudFormation resources are required. Use a
+named AWS CLI profile and verify the account and region before creating anything.
+Set `AWS_PROFILE` to that profile in the shell used for every `eksctl` command:
 
 ```sh
+export AWS_PROFILE=<sandbox-admin-profile>
 aws sts get-caller-identity
-aws configure get region
+aws eks list-clusters --region ap-south-1
 eksctl create cluster -f infra/sandbox-eks/cluster.yaml --dry-run
 ```
+
+Confirm the reported ARN is a non-root identity in the intended account. The
+cluster file fixes the region to `ap-south-1`; a CLI default region does not
+override it. If `eksctl` cannot use the profile's temporary credentials, stop
+and fix its credential provider before creating resources. Do not replace it
+with the account root profile or long-lived access keys.
 
 Creating the cluster starts charges. AWS lists the standard EKS control plane
 at **$0.10/hour**, plus the managed EC2 worker, its EBS volume, NAT gateway,
@@ -31,6 +39,7 @@ cluster after the live demo.
 Run only after confirming the AWS account and cost:
 
 ```sh
+export AWS_PROFILE=<sandbox-admin-profile>
 eksctl create cluster -f infra/sandbox-eks/cluster.yaml
 kubectl --context <new-sandbox-context> get nodes
 eksctl delete cluster -f infra/sandbox-eks/cluster.yaml
