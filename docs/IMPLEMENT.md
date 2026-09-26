@@ -342,7 +342,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Malformed, ambiguous, and unsupported actions cannot reach validation or execution.
 - The UI summary and executor input derive from the same action version.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; CI passed. PR/commit: 9c32989
 
 ### 17. Provision isolated sandbox runs
 
