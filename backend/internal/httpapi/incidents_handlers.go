@@ -20,6 +20,14 @@ type incidentStore interface {
 	Events(ctx context.Context, id uuid.UUID) ([]incidents.Event, error)
 }
 
+// workflowStarter begins a durable investigation for a newly created incident.
+type workflowStarter interface {
+	StartForIncident(ctx context.Context, inc incidents.Incident) error
+}
+
+// WorkflowStarter is the exported alias used when wiring the server.
+type WorkflowStarter = workflowStarter
+
 // manualAlertIdentity marks incidents opened by an operator rather than an alert.
 const manualAlertIdentity = "operator"
 
@@ -94,6 +102,12 @@ func (s *Server) handleStartInvestigation(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		s.internalError(w, "create incident", err)
 		return
+	}
+	if s.workflow != nil {
+		// Start the durable investigation without blocking the response.
+		go func(started incidents.Incident) {
+			_ = s.workflow.StartForIncident(context.Background(), started)
+		}(inc)
 	}
 	writeJSON(w, http.StatusCreated, inc)
 }

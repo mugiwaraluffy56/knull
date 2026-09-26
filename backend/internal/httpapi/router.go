@@ -40,6 +40,7 @@ type Options struct {
 	Services       serviceStore
 	Incidents      incidentStore
 	FleetIncidents fleetIncidentSource
+	Workflow       workflowStarter
 	AlertIntake    alertIntake
 	AlertFailures  failureRecorder
 	AlertSecret    string
@@ -60,6 +61,7 @@ type Server struct {
 	services       serviceStore
 	incidents      incidentStore
 	fleetIncidents fleetIncidentSource
+	workflow       workflowStarter
 	alertIntake    alertIntake
 	alertFailures  failureRecorder
 	alertSecret    string
@@ -87,6 +89,7 @@ func New(opts Options) *Server {
 		services:       opts.Services,
 		incidents:      opts.Incidents,
 		fleetIncidents: opts.FleetIncidents,
+		workflow:       opts.Workflow,
 		alertIntake:    opts.AlertIntake,
 		alertFailures:  opts.AlertFailures,
 		alertSecret:    opts.AlertSecret,

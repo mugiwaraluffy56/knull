@@ -27,6 +27,11 @@ type FailureRecorder interface {
 	Record(ctx context.Context, reason, remoteAddr, detail string) error
 }
 
+// WorkflowStarter begins a durable investigation for a newly created incident.
+type WorkflowStarter interface {
+	StartForIncident(ctx context.Context, inc incidents.Incident) error
+}
+
 // Disposition is the outcome of processing a single alert.
 type Disposition string
 
@@ -50,8 +55,13 @@ type Intake struct {
 	incidents IncidentStore
 	services  ServiceResolver
 	failures  FailureRecorder
+	workflow  WorkflowStarter
 	mapping   LabelMapping
 }
+
+// SetWorkflow attaches a workflow starter so newly created incidents begin a
+// durable investigation. Optional; when unset, incidents are created only.
+func (i *Intake) SetWorkflow(w WorkflowStarter) { i.workflow = w }
 
 // NewIntake builds an Intake. services and failures may be nil.
 func NewIntake(inc IncidentStore, svc ServiceResolver, fail FailureRecorder, mapping LabelMapping) *Intake {
@@ -139,6 +149,9 @@ func (i *Intake) createIncident(ctx context.Context, na NormalizedAlert) (Outcom
 	})
 	if err != nil {
 		return Outcome{}, fmt.Errorf("create incident: %w", err)
+	}
+	if i.workflow != nil {
+		go func() { _ = i.workflow.StartForIncident(context.Background(), inc) }()
 	}
 	return Outcome{AlertIdentity: na.AlertIdentity, Disposition: DispositionCreated, IncidentID: &inc.ID}, nil
 }

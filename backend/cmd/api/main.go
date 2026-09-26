@@ -24,6 +24,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
 	"github.com/mugiwaraluffy56/knull/backend/internal/store"
+	"github.com/mugiwaraluffy56/knull/backend/internal/workflow"
 )
 
 func main() {
@@ -65,6 +66,19 @@ func run(logger *slog.Logger) error {
 		EnvironmentLabel: cfg.AlertEnvironmentLabel,
 	})
 
+	var workflowManager *workflow.Manager
+	if cfg.TrueForgeURL != "" {
+		runtime := workflow.NewHTTPRuntime(cfg.TrueForgeURL, cfg.TrueForgeToken)
+		workflowManager = workflow.NewManager(runtime, incidentStore, logger)
+		alertIntake.SetWorkflow(workflowManager)
+		logger.Info("trueforge workflow enabled", "url", cfg.TrueForgeURL)
+		if err := workflowManager.ResumeAll(ctx); err != nil {
+			logger.Error("resume workflows", "error", err)
+		}
+	} else {
+		logger.Warn("KNULL_TRUEFORGE_URL not set; durable investigations are disabled")
+	}
+
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
 		cipher, err = secrets.NewCipher(cfg.SecretKey)
@@ -104,6 +118,7 @@ func run(logger *slog.Logger) error {
 			Services:       serviceStore,
 			Incidents:      incidentStore,
 			FleetIncidents: incidentStore,
+			Workflow:       workflowStarterOrNil(workflowManager),
 			AlertIntake:    alertIntake,
 			AlertFailures:  alertFailures,
 			AlertSecret:    cfg.AlertmanagerSecret,
@@ -136,4 +151,14 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("server stopped cleanly")
 	return nil
+}
+
+// workflowStarterOrNil returns a nil interface when no manager is configured, so
+// the HTTP layer correctly treats the workflow as absent rather than holding a
+// non-nil interface wrapping a nil pointer.
+func workflowStarterOrNil(m *workflow.Manager) httpapi.WorkflowStarter {
+	if m == nil {
+		return nil
+	}
+	return m
 }

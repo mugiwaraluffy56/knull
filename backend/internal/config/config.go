@@ -50,6 +50,12 @@ type Config struct {
 	// the service key and environment.
 	AlertServiceLabel     string
 	AlertEnvironmentLabel string
+
+	// TrueForgeURL is the base URL of the TrueForge workflow runtime. Empty
+	// disables durable workflows (incidents are created but not investigated).
+	TrueForgeURL string
+	// TrueForgeToken authenticates requests to TrueForge.
+	TrueForgeToken string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -91,6 +97,8 @@ func Load() (Config, error) {
 		AlertmanagerSecret:    os.Getenv("KNULL_ALERTMANAGER_SECRET"),
 		AlertServiceLabel:     getenv("KNULL_ALERT_SERVICE_LABEL", "service"),
 		AlertEnvironmentLabel: getenv("KNULL_ALERT_ENVIRONMENT_LABEL", "environment"),
+		TrueForgeURL:          os.Getenv("KNULL_TRUEFORGE_URL"),
+		TrueForgeToken:        os.Getenv("KNULL_TRUEFORGE_TOKEN"),
 	}
 
 	if d, err := durationSeconds("KNULL_SESSION_TTL_SECONDS"); err != nil {

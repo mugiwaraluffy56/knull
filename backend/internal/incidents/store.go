@@ -24,19 +24,21 @@ var (
 
 // Incident is the current-state projection of an incident.
 type Incident struct {
-	ID            uuid.UUID         `json:"id"`
-	ServiceID     *uuid.UUID        `json:"serviceId,omitempty"`
-	ServiceKey    string            `json:"serviceKey"`
-	Environment   string            `json:"environment"`
-	AlertIdentity string            `json:"alertIdentity"`
-	Summary       string            `json:"summary"`
-	Symptoms      map[string]string `json:"symptoms"`
-	State         State             `json:"state"`
-	Version       int64             `json:"version"`
-	CorrelationID string            `json:"correlationId"`
-	CreatedAt     time.Time         `json:"createdAt"`
-	UpdatedAt     time.Time         `json:"updatedAt"`
-	ClosedAt      *time.Time        `json:"closedAt,omitempty"`
+	ID                uuid.UUID         `json:"id"`
+	ServiceID         *uuid.UUID        `json:"serviceId,omitempty"`
+	ServiceKey        string            `json:"serviceKey"`
+	Environment       string            `json:"environment"`
+	AlertIdentity     string            `json:"alertIdentity"`
+	Summary           string            `json:"summary"`
+	Symptoms          map[string]string `json:"symptoms"`
+	State             State             `json:"state"`
+	Version           int64             `json:"version"`
+	CorrelationID     string            `json:"correlationId"`
+	WorkflowSessionID string            `json:"workflowSessionId,omitempty"`
+	WorkflowRunID     string            `json:"workflowRunId,omitempty"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
+	ClosedAt          *time.Time        `json:"closedAt,omitempty"`
 }
 
 // Event is one immutable entry in an incident's history.
@@ -322,14 +324,56 @@ func (s *Store) Events(ctx context.Context, id uuid.UUID) ([]Event, error) {
 }
 
 const incidentColumns = `id, service_id, service_key, environment, alert_identity,
-	summary, symptoms, state, version, correlation_id, created_at, updated_at, closed_at`
+	summary, symptoms, state, version, correlation_id,
+	workflow_session_id, workflow_run_id, created_at, updated_at, closed_at`
 
 func incidentTargets(inc *Incident) []any {
 	return []any{
 		&inc.ID, &inc.ServiceID, &inc.ServiceKey, &inc.Environment, &inc.AlertIdentity,
 		&inc.Summary, &inc.Symptoms, &inc.State, &inc.Version, &inc.CorrelationID,
-		&inc.CreatedAt, &inc.UpdatedAt, &inc.ClosedAt,
+		&inc.WorkflowSessionID, &inc.WorkflowRunID, &inc.CreatedAt, &inc.UpdatedAt, &inc.ClosedAt,
 	}
+}
+
+// SaveWorkflow records the durable workflow session/run identifiers on an
+// incident so the investigation can be resumed after a restart.
+func (s *Store) SaveWorkflow(ctx context.Context, id uuid.UUID, sessionID, runID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE incidents SET workflow_session_id = $2, workflow_run_id = $3, updated_at = now() WHERE id = $1`,
+		id, sessionID, runID)
+	if err != nil {
+		return fmt.Errorf("save workflow ids: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListResumable returns incidents that have a workflow session and are not in a
+// terminal or already-resolved state, so their streams can be re-attached on
+// startup.
+func (s *Store) ListResumable(ctx context.Context) ([]Incident, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+incidentColumns+`
+		FROM incidents
+		WHERE workflow_session_id <> '' AND state NOT IN ($1,$2,$3,$4,$5)
+		ORDER BY updated_at DESC`,
+		string(StateClosed), string(StateRecovered), string(StateEscalated),
+		string(StateDenied), string(StateFailed))
+	if err != nil {
+		return nil, fmt.Errorf("list resumable: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Incident
+	for rows.Next() {
+		var inc Incident
+		if err := rows.Scan(incidentTargets(&inc)...); err != nil {
+			return nil, fmt.Errorf("scan incident: %w", err)
+		}
+		out = append(out, inc)
+	}
+	return out, rows.Err()
 }
 
 // appendEvent inserts one immutable history row. The UNIQUE(incident_id, seq)

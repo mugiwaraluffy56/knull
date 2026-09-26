@@ -177,7 +177,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - A paused session can resume after reconnect or backend restart without duplicating prior production actions.
 - TrueForge errors leave a visible incident failure/escalation state.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; verification passes. PR/commit: 6c8f856 (live TrueForge verify pending — no endpoint available)
 
 ### 9. Build the incident evidence timeline
 
