@@ -165,6 +165,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Implement a Go TrueForge client using its HTTP API and Server-Sent Events; do not require the TypeScript SDK in the backend.
 - Start a TrueForge session for each incident and persist the session/run identifiers.
 - Stream workflow progress into the incident event model.
+- Expose TrueForge's isolated code-execution capability to the workflow for bounded, agent-authored validation code. Give generated code only the sandbox-scoped access it needs; production credentials and mutation tools stay outside that execution environment.
 - Support workflow pause, resume, cancellation, and reconnect after backend restart.
 - Add bounded retry behavior for safe session reads and explicit handling for unavailable TrueForge sessions.
 
@@ -172,6 +173,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 
 - Alert-created and operator-created incidents both start the same durable workflow.
 - Workflow progress is visible through incident events.
+- The incident event stream records when generated validation code starts and finishes, with a reference to the code artifact, sandbox run, exit status, and bounded output summary.
 - A paused session can resume after reconnect or backend restart without duplicating prior production actions.
 - TrueForge errors leave a visible incident failure/escalation state.
 
@@ -186,6 +188,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Build a chronological timeline for alert receipt, workflow progress, integration calls, findings, Jev decisions, sandbox actions, approvals, production execution, and recovery.
 - Render concise operator-readable summaries with source, target, and observation time.
 - Separate observed facts, hypotheses, decisions, and actions in the display.
+- Show the agent-authored validation code or a reviewable artifact reference, its sandbox run status, and its output summary as distinct from observed infrastructure evidence.
 - Link evidence to its incident and preserve ordering when events arrive asynchronously.
 - Redact sensitive fields before persistence and rendering.
 
@@ -368,19 +371,22 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 
 ### 18. Validate the primary memory-limit remediation
 
-**Depends on:** 10, 11, 12, 16, 17
+**Depends on:** 8, 10, 11, 12, 16, 17
 
 **Build details**
 
 - Configure a representative checkout workload that can reproduce OOM failure at `256Mi` and stable operation at `1Gi`.
 - Apply the proposed `256Mi` to `1Gi` change only in the sandbox.
-- Start the workload, generate the selected load profile, and observe pod health, error rate, and latency.
-- Store pass/fail results, verification window, metric values, workload state, and sandbox/production differences.
+- Have TrueForge produce a bounded validation script for the scenario and execute it in its isolated sandbox with sandbox-only access. The script exercises the candidate workload and reports pod health, error rate, and latency; it cannot reach production or use production credentials.
+- Start the representative workload with the candidate setting, generate the selected load profile, and collect the script output plus independent Kubernetes and Prometheus observations.
+- Store the generated code or immutable artifact reference, sandbox run identity, exit status, bounded output, pass/fail result, verification window, metric values, workload state, and sandbox/production differences.
+- Treat code-generation errors, execution errors, timeouts, missing observations, and failed cleanup as failed validation; none may proceed to production approval.
 
 **Verify**
 
 - The known failing `256Mi` configuration reproduces the expected workload failure in the sandbox.
 - The proposed `1Gi` configuration passes the configured sandbox checks.
+- The incident timeline shows TrueForge execute the generated validation code in the sandbox and records its result alongside independent workload and metric observations.
 - Failed, incomplete, or unavailable validation cannot become eligible for production approval.
 
 **Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
@@ -619,6 +625,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Make the OpenAI API credential customer-configured. Document that incident evidence is sent to the selected model API, redact secrets, and minimize submitted evidence.
 - Document environment setup, integration configuration, operator access, installation and upgrades, incident operations, and recovery from a failed deployment.
 - Run the primary memory-limit flow and the bad-deployment and traffic-spike flows against a real Kubernetes environment with live integrations.
+- Prepare a five-minute demo script for the completed primary path and disclose the AI assistants used in the repository README.
 - Resolve defects found by those acceptance runs and record any remaining spec gaps explicitly.
 
 **Verify**
@@ -627,6 +634,8 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - An engineer can install and upgrade the complete product in a clean customer-style AWS/EKS environment using the documented Helm release.
 - Product operation requires no inbound access from Knull-operated infrastructure; integration and model API egress is documented and configurable.
 - All three end-to-end incident paths satisfy their acceptance criteria in `docs/SPEC.md`.
+- In the primary demo, judges can see TrueForge reach a real MCP-connected system, execute agent-authored code in the isolated sandbox, and pause for a person before any production mutation; approval permits only the reviewed action, followed by live recovery verification.
+- A clean clone can run the primary demo by following the README, including setup, required credentials, and the five-minute demo steps.
 - Approval denial and stale-action checks prove production remains unchanged.
 - An approved action changes the intended resource and the verifier reports the observed recovery result.
 - Operating and troubleshooting instructions are sufficient for another engineer to deploy and run the system.
