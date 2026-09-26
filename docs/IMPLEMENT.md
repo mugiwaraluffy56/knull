@@ -220,7 +220,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Failed tool calls appear as failures and do not become successful findings.
 - The investigation has no production mutation capability through this read-only connection.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: d391f76 (live cluster + MCP server verify pending)
+**Completion:** [x] Code pushed; verification passes. PR/commit: 1a0e276 (live cluster + MCP server verify pending)
 
 ### 11. Show Prometheus findings in incidents
 
