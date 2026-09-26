@@ -169,13 +169,43 @@ PostgreSQL and Redis, Prometheus/Alertmanager, and a read-only GitHub App. The
 customer configures the OpenAI API credential; redacted incident evidence is
 sent to that API. Setup steps will be documented with the implementation.
 
+## Local development
+
+You need Go (see `backend/go.mod`), Node.js 24, [pnpm](https://pnpm.io), and
+Docker with Compose.
+
+```bash
+make deps          # install backend and frontend dependencies
+make up            # start PostgreSQL and Redis, wait until healthy
+make dev-api       # terminal 1: Go incident API on http://localhost:8080
+make dev-web       # terminal 2: Next.js UI on http://localhost:3000
+```
+
+Open the UI: the home page is a health page that calls the backend and shows
+whether the API, PostgreSQL, and Redis are reachable. Backend health endpoints
+are `GET /healthz` (liveness) and `GET /readyz` (readiness with dependency
+detail).
+
+Run all checks the way CI does:
+
+```bash
+make check         # go vet + tests, then frontend gen/typecheck/lint/build
+```
+
+If host port 5432 is busy, the Compose stack maps PostgreSQL to host port
+`55432`; the default connection string already matches.
+
 ## Repo layout
 
 ```text
-docs/PRD.md       The product brief.
-docs/SPEC.md      Detailed product and architecture specification.
-docs/IMPLEMENT.md Dependency-ordered implementation checklist.
-README.md         This file.
+docs/PRD.md         The product brief.
+docs/SPEC.md        Detailed product and architecture specification.
+docs/IMPLEMENT.md   Dependency-ordered implementation checklist.
+backend/            Go incident API (net/http), migrations, OpenAPI contract.
+web/                Next.js App Router UI (TypeScript, React).
+docker-compose.yml  Local PostgreSQL and Redis.
+Makefile            Developer workflow entry points (make help).
+README.md           This file.
 ```
 
 More directories will show up as the code grows. This section will track them.

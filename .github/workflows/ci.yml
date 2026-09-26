@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: knull
+          POSTGRES_PASSWORD: knull
+          POSTGRES_DB: knull
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U knull -d knull"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: gofmt
+        working-directory: backend
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && echo 'run gofmt' && exit 1)
+      - name: go vet
+        working-directory: backend
+        run: go vet ./...
+      - name: go build
+        working-directory: backend
+        run: go build ./...
+      - name: go test
+        working-directory: backend
+        env:
+          KNULL_DATABASE_URL: postgres://knull:knull@localhost:5432/knull?sslmode=disable
+          KNULL_REDIS_URL: redis://localhost:6379/0
+        run: go test ./...
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Generate API client
+        working-directory: web
+        run: pnpm gen:api
+      - name: Verify generated client is in sync
+        run: git diff --exit-code web/lib/generated/api.ts
+      - name: Typecheck
+        working-directory: web
+        run: pnpm typecheck
+      - name: Lint
+        working-directory: web
+        run: pnpm lint
+      - name: Build
+        working-directory: web
+        run: pnpm build

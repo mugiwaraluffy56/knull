@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Knull Incident API
+  version: 0.1.0
+  description: >
+    HTTP contract for the Knull incident API. This foundation slice defines the
+    health endpoints; incident, service, and approval operations are added by
+    later implementation tasks. The TypeScript client types are generated from
+    this document.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: Liveness probe
+      description: Reports that the process is running. Does not check dependencies.
+      responses:
+        "200":
+          description: Process is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Readiness probe
+      description: >
+        Checks every backing dependency. Returns 200 when all are reachable and
+        503 with per-dependency detail otherwise.
+      responses:
+        "200":
+          description: All dependencies reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: One or more dependencies unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - checkedAt
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          description: Overall health of the service.
+        dependencies:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, unavailable]
+          description: Per-dependency status, present on readiness responses.
+        checkedAt:
+          type: string
+          format: date-time
+          description: RFC 3339 timestamp when the check ran.

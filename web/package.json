@@ -1,0 +1,31 @@
+{
+  "name": "knull-web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../backend/openapi/openapi.yaml -o lib/generated/api.ts"
+  },
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.7.0",
+    "@types/react": "19.1.9",
+    "@types/react-dom": "19.1.7",
+    "@eslint/eslintrc": "3.3.1",
+    "eslint": "9.37.0",
+    "eslint-config-next": "15.5.4",
+    "openapi-typescript": "7.9.1",
+    "typescript": "5.9.2"
+  }
+}
