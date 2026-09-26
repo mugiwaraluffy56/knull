@@ -240,7 +240,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - A query error or empty series is distinguishable from a zero value.
 - Queries for one environment cannot return results for another through the service mapping.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: ba0b65e (live Prometheus + MCP server verify pending)
+**Completion:** [x] Code pushed; CI recovered in b7c6f66 after gofmt fix. PR/commit: ba0b65e (live Prometheus + MCP server verify pending)
 
 ### 12. Correlate GitHub deployment changes
 
@@ -260,7 +260,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Missing repositories or permissions are shown as unavailable evidence.
 - The agent never receives GitHub write capability through this integration.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: 647569d (live GitHub App + MCP server verify pending)
+**Completion:** [x] Code pushed; CI recovered in b7c6f66 after gofmt fix. PR/commit: 647569d (live GitHub App + MCP server verify pending)
 
 ### 13. Implement the Jev MCP server in Go
 
@@ -284,7 +284,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Invalid schema output, unknown evidence references, timeout, or provider errors return typed failures and cannot advance an incident toward execution.
 - Contract tests validate request and response shapes.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; CI passed. PR/commit: b7c6f66 (live OpenAI call pending)
 
 ### 14. Classify incident causes from evidence
 
