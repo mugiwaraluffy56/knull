@@ -260,6 +260,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/alerts/webhook:
+    post:
+      operationId: alertWebhook
+      summary: Prometheus Alertmanager webhook
+      description: >
+        Receives Alertmanager notifications. Authenticated by a shared secret
+        (Bearer token or `token` query param), not an operator session.
+        Unauthorized or malformed deliveries are recorded and rejected.
+      responses:
+        "202":
+          description: Delivery processed; per-alert outcomes returned.
+        "400":
+          description: Malformed payload.
+        "401":
+          description: Invalid or missing secret.
   /api/incidents:
     get:
       operationId: listIncidents

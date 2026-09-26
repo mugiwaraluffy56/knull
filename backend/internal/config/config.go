@@ -43,6 +43,13 @@ type Config struct {
 	// SecretKey is the 32-byte AES-256 key (base64 or hex) used to encrypt
 	// stored integration credentials at rest. Required to store credentials.
 	SecretKey string
+	// AlertmanagerSecret authenticates the Alertmanager webhook. Empty disables
+	// intake (fail closed).
+	AlertmanagerSecret string
+	// AlertServiceLabel/AlertEnvironmentLabel name the alert labels that carry
+	// the service key and environment.
+	AlertServiceLabel     string
+	AlertEnvironmentLabel string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -76,11 +83,14 @@ func Load() (Config, error) {
 			ClientID:     getenv("KNULL_OIDC_CLIENT_ID", "knull-backend"),
 			ClientSecret: getenv("KNULL_OIDC_CLIENT_SECRET", "knull-local-secret"),
 		},
-		SessionTTL:   8 * time.Hour,
-		CookieSecure: getenvBool("KNULL_COOKIE_SECURE", false),
-		AppBaseURL:   getenv("KNULL_APP_BASE_URL", "http://localhost:8080"),
-		UIBaseURL:    getenv("KNULL_UI_BASE_URL", "http://localhost:3000"),
-		SecretKey:    os.Getenv("KNULL_SECRET_KEY"),
+		SessionTTL:            8 * time.Hour,
+		CookieSecure:          getenvBool("KNULL_COOKIE_SECURE", false),
+		AppBaseURL:            getenv("KNULL_APP_BASE_URL", "http://localhost:8080"),
+		UIBaseURL:             getenv("KNULL_UI_BASE_URL", "http://localhost:3000"),
+		SecretKey:             os.Getenv("KNULL_SECRET_KEY"),
+		AlertmanagerSecret:    os.Getenv("KNULL_ALERTMANAGER_SECRET"),
+		AlertServiceLabel:     getenv("KNULL_ALERT_SERVICE_LABEL", "service"),
+		AlertEnvironmentLabel: getenv("KNULL_ALERT_ENVIRONMENT_LABEL", "environment"),
 	}
 
 	if d, err := durationSeconds("KNULL_SESSION_TTL_SECONDS"); err != nil {

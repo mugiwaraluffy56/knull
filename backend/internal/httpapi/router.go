@@ -39,6 +39,9 @@ type Options struct {
 	Secrets       secretStore
 	Services      serviceStore
 	Incidents     incidentStore
+	AlertIntake   alertIntake
+	AlertFailures failureRecorder
+	AlertSecret   string
 	AppBaseURL    string
 	UIBaseURL     string
 	Logger        *slog.Logger
@@ -55,6 +58,9 @@ type Server struct {
 	secrets       secretStore
 	services      serviceStore
 	incidents     incidentStore
+	alertIntake   alertIntake
+	alertFailures failureRecorder
+	alertSecret   string
 	appBaseURL    string
 	uiBaseURL     string
 	logger        *slog.Logger
@@ -78,6 +84,9 @@ func New(opts Options) *Server {
 		secrets:       opts.Secrets,
 		services:      opts.Services,
 		incidents:     opts.Incidents,
+		alertIntake:   opts.AlertIntake,
+		alertFailures: opts.AlertFailures,
+		alertSecret:   opts.AlertSecret,
 		appBaseURL:    opts.AppBaseURL,
 		uiBaseURL:     opts.UIBaseURL,
 		logger:        opts.Logger,
@@ -94,6 +103,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/login", s.handleLogin)
 	mux.HandleFunc("GET /api/auth/callback", s.handleCallback)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
+
+	// Alert intake is authenticated by a shared secret, not an operator session.
+	mux.HandleFunc("POST /api/alerts/webhook", s.handleAlertWebhook)
 
 	// Operator-only endpoints.
 	mux.Handle("GET /api/me", s.requireOperator(http.HandlerFunc(s.handleMe)))

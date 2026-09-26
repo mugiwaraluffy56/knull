@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mugiwaraluffy56/knull/backend/internal/alerts"
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
@@ -58,6 +59,11 @@ func run(logger *slog.Logger) error {
 	operatorStore := operators.NewStore(st.Pool)
 	serviceStore := services.NewStore(st.Pool)
 	incidentStore := incidents.NewStore(st.Pool)
+	alertFailures := alerts.NewFailureStore(st.Pool)
+	alertIntake := alerts.NewIntake(incidentStore, serviceStore, alertFailures, alerts.LabelMapping{
+		ServiceLabel:     cfg.AlertServiceLabel,
+		EnvironmentLabel: cfg.AlertEnvironmentLabel,
+	})
 
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
@@ -97,6 +103,9 @@ func run(logger *slog.Logger) error {
 			Secrets:       secretStore,
 			Services:      serviceStore,
 			Incidents:     incidentStore,
+			AlertIntake:   alertIntake,
+			AlertFailures: alertFailures,
+			AlertSecret:   cfg.AlertmanagerSecret,
 			AppBaseURL:    cfg.AppBaseURL,
 			UIBaseURL:     cfg.UIBaseURL,
 			Logger:        logger,

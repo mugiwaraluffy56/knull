@@ -194,6 +194,57 @@ func (s *Store) Transition(ctx context.Context, id uuid.UUID, t Transition) (Inc
 	return inc, nil
 }
 
+// FindActiveByAlert returns the active (non-closed) incident matching a
+// service+environment+alert identity, used to deduplicate repeated alert
+// deliveries. ErrNotFound means no active incident exists for that alert.
+func (s *Store) FindActiveByAlert(ctx context.Context, serviceKey, environment, alertIdentity string) (Incident, error) {
+	var inc Incident
+	err := s.pool.QueryRow(ctx, `SELECT `+incidentColumns+`
+		FROM incidents
+		WHERE service_key = $1 AND environment = $2 AND alert_identity = $3
+		  AND state <> $4
+		ORDER BY created_at DESC
+		LIMIT 1`,
+		serviceKey, environment, alertIdentity, string(StateClosed)).
+		Scan(incidentTargets(&inc)...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Incident{}, ErrNotFound
+	}
+	if err != nil {
+		return Incident{}, fmt.Errorf("find active incident: %w", err)
+	}
+	return inc, nil
+}
+
+// AppendNote appends a non-transition audit event to an incident's history
+// without changing its state. Used to attach repeat/resolved alert
+// notifications to an existing incident.
+func (s *Store) AppendNote(ctx context.Context, id uuid.UUID, actor, reason string, data map[string]any) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM incidents WHERE id = $1)`, id).Scan(&exists); err != nil {
+			return fmt.Errorf("check incident: %w", err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
+		var seq int64
+		if err := tx.QueryRow(ctx,
+			`SELECT COALESCE(MAX(seq),0)+1 FROM incident_events WHERE incident_id = $1`, id).Scan(&seq); err != nil {
+			return fmt.Errorf("next seq: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE incidents SET updated_at = now() WHERE id = $1`, id); err != nil {
+			return fmt.Errorf("touch incident: %w", err)
+		}
+		return appendEvent(ctx, tx, id, seq, Event{
+			Type:   EventNote,
+			Actor:  actor,
+			Reason: reason,
+			Data:   data,
+		})
+	})
+}
+
 // Get returns an incident by id.
 func (s *Store) Get(ctx context.Context, id uuid.UUID) (Incident, error) {
 	var inc Incident

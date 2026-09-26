@@ -124,6 +124,19 @@ func (s *Store) Get(ctx context.Context, id uuid.UUID) (Service, error) {
 	return svc, nil
 }
 
+// ResolveID returns the id of an enabled service matching key+environment. The
+// boolean is false when no such service is configured, so alert intake can still
+// record an incident for an unmapped service without failing.
+func (s *Store) ResolveID(ctx context.Context, key, environment string) (uuid.UUID, bool) {
+	var id uuid.UUID
+	err := s.pool.QueryRow(ctx,
+		`SELECT id FROM services WHERE key = $1 AND environment = $2`, key, environment).Scan(&id)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
 // List returns all services ordered by environment then key.
 func (s *Store) List(ctx context.Context) ([]Service, error) {
 	rows, err := s.pool.Query(ctx, `SELECT `+serviceColumns+` FROM services ORDER BY environment, key`)
