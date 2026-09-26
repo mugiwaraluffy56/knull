@@ -154,7 +154,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Missing telemetry is labeled unavailable and cannot make an unhealthy service appear healthy.
 - The page remains usable with an empty fleet and with integration failures.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: 0b20677
+**Completion:** [x] Code pushed; verification passes. PR/commit: 698c38a
 
 ### 8. Run durable investigations through TrueForge
 
