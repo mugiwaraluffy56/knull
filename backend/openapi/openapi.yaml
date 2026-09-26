@@ -451,6 +451,41 @@ paths:
           description: Incident not found.
         "503":
           description: Action planning unavailable.
+  /api/incidents/{id}/sandbox-runs:
+    post:
+      operationId: prepareSandboxRun
+      summary: Prepare and clean up a dedicated-cluster sandbox run
+      description: Creates a restricted run namespace for a sealed action and records its provenance. Prepared does not mean validation passed.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actionEventId, workload]
+              properties:
+                actionEventId: { type: string, format: uuid }
+                workload:
+                  $ref: "#/components/schemas/SandboxWorkload"
+      responses:
+        "202":
+          description: Run prepared and cleanup verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxRecordedRun"
+        "400":
+          description: Invalid request.
+        "401":
+          description: Authentication required.
+        "404":
+          description: Incident not found.
+        "422":
+          description: Sandbox isolation, execution, or cleanup failed.
+        "503":
+          description: Dedicated sandbox cluster not configured.
 components:
   parameters:
     ServiceId:
@@ -468,6 +503,41 @@ components:
         type: string
         format: uuid
   schemas:
+    SandboxWorkload:
+      type: object
+      required: [imageDigest, container, replicas, cpu, memory]
+      properties:
+        imageDigest: { type: string }
+        container: { type: string }
+        replicas: { type: integer }
+        cpu: { type: string }
+        memory: { type: string }
+    SandboxRecordedRun:
+      type: object
+      required: [eventId, run]
+      properties:
+        eventId: { type: string, format: uuid }
+        run:
+          type: object
+          required: [id, namespace, clusterUid, actionDigest, actionVersion, workload, limitations, environmentDifferences, startedAt, finishedAt, cleanupVerified, status]
+          properties:
+            id: { type: string, format: uuid }
+            namespace: { type: string }
+            clusterUid: { type: string }
+            actionDigest: { type: string }
+            actionVersion: { type: string }
+            workload: { $ref: "#/components/schemas/SandboxWorkload" }
+            limitations:
+              type: array
+              items: { type: string }
+            environmentDifferences:
+              type: array
+              items: { type: string }
+            startedAt: { type: string, format: date-time }
+            finishedAt: { type: string, format: date-time }
+            cleanupVerified: { type: boolean }
+            status: { type: string, enum: [prepared, failed] }
+            error: { type: string }
     ActionTarget:
       type: object
       required: [cluster, namespace, kind, name]

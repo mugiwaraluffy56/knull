@@ -133,6 +133,11 @@ An authenticated operator can record a scoped proposal with
 a digest, exact target and preconditions, and evidence links. The incident
 timeline renders its before/after values from that contract.
 
+Sandbox setup requires a separate EKS cluster and sandbox-only identity. See
+[`docs/SANDBOX.md`](docs/SANDBOX.md) for the installation requirements and run
+API. A prepared sandbox run is recorded with its cleanup outcome; it is not
+evidence that the proposed fix passed validation.
+
 ### What Jev decides
 
 Jev answers four questions with typed results, evidence references, and uncertainty:

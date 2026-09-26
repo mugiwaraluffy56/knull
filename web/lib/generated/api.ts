@@ -311,10 +311,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidents/{id}/sandbox-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare and clean up a dedicated-cluster sandbox run
+         * @description Creates a restricted run namespace for a sealed action and records its provenance. Prepared does not mean validation passed.
+         */
+        post: operations["prepareSandboxRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SandboxWorkload: {
+            imageDigest: string;
+            container: string;
+            replicas: number;
+            cpu: string;
+            memory: string;
+        };
+        SandboxRecordedRun: {
+            /** Format: uuid */
+            eventId: string;
+            run: {
+                /** Format: uuid */
+                id: string;
+                namespace: string;
+                clusterUid: string;
+                actionDigest: string;
+                actionVersion: string;
+                workload: components["schemas"]["SandboxWorkload"];
+                limitations: string[];
+                environmentDifferences: string[];
+                /** Format: date-time */
+                startedAt: string;
+                /** Format: date-time */
+                finishedAt: string;
+                cleanupVerified: boolean;
+                /** @enum {string} */
+                status: "prepared" | "failed";
+                error?: string;
+            };
+        };
         ActionTarget: {
             cluster: string;
             namespace: string;
@@ -1192,6 +1242,71 @@ export interface operations {
                 content?: never;
             };
             /** @description Action planning unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    prepareSandboxRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    actionEventId: string;
+                    workload: components["schemas"]["SandboxWorkload"];
+                };
+            };
+        };
+        responses: {
+            /** @description Run prepared and cleanup verified. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxRecordedRun"];
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sandbox isolation, execution, or cleanup failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Dedicated sandbox cluster not configured. */
             503: {
                 headers: {
                     [name: string]: unknown;

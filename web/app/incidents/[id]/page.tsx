@@ -137,6 +137,7 @@ export default function IncidentPage({
                   {e.source === "jev" && <JevClassification event={e} />}
                   {(e.source === "jev-next-action" || e.source === "jev-risk") && <JevDecision event={e} />}
                   {e.source === "action-plan" && <ActionPlan event={e} />}
+                  {e.source === "sandbox" && <SandboxRun event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -194,6 +195,19 @@ function ActionPlan({ event }: { event: IncidentEvent }) {
     <div>Expected impact: {contract.expectedImpact} · risk: {contract.risk}</div>
     {Array.isArray(contract.evidenceIds) && <div>Evidence: {contract.evidenceIds.map((id, index) => <span key={id}>{index > 0 ? ", " : ""}<a href={`#event-${id}`}>{id.slice(0, 8)}</a></span>)}</div>}
     <div className="auth-muted">{contract.version} · digest {contract.digest.slice(0, 12)} · proposal only</div>
+  </div>;
+}
+
+function SandboxRun({ event }: { event: IncidentEvent }) {
+  const run = event.data?.run as { id?: string; namespace?: string; clusterUid?: string; actionDigest?: string; status?: string; cleanupVerified?: boolean; limitations?: string[]; error?: string } | undefined;
+  if (!run?.id) return null;
+  return <div className="metric-finding">
+    <strong>Sandbox run · {run.status}</strong>
+    <div>Run {run.id.slice(0, 8)} · namespace {run.namespace} · cluster {run.clusterUid}</div>
+    <div>Action digest {run.actionDigest?.slice(0, 12)} · cleanup {run.cleanupVerified ? "verified" : "unverified"}</div>
+    {run.error && <div>Failure: {run.error}</div>}
+    {Array.isArray(run.limitations) && run.limitations.map((item) => <div key={item}>Limitation: {item}</div>)}
+    <div className="auth-muted">Prepared means isolated setup completed; validation has not passed.</div>
   </div>;
 }
 

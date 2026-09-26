@@ -26,6 +26,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/mcp"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
 	"github.com/mugiwaraluffy56/knull/backend/internal/respond"
+	"github.com/mugiwaraluffy56/knull/backend/internal/sandbox"
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
 	"github.com/mugiwaraluffy56/knull/backend/internal/store"
@@ -120,6 +121,13 @@ func run(logger *slog.Logger) error {
 		classifier.SetNext(respond.NewService(incidentStore, jevClient, cfg.JevMinConfidence))
 		logger.Info("Jev classification enabled", "url", cfg.JevMCPURL)
 	}
+	var sandboxService *sandbox.Service
+	if cfg.SandboxKubeconfig != "" {
+		client := sandbox.Kubectl{Kubeconfig: cfg.SandboxKubeconfig, Context: cfg.SandboxContext}
+		runner := sandbox.NewRunner(client, sandbox.Config{ClusterUID: cfg.SandboxClusterUID, ProductionClusterUIDs: cfg.ProductionClusterUIDs, AllowedImageRegistry: cfg.SandboxImageRegistry, PullSecretName: cfg.SandboxPullSecretName})
+		sandboxService = sandbox.NewService(incidentStore, runner)
+		logger.Info("sandbox runner configured", "cluster_uid", cfg.SandboxClusterUID)
+	}
 
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
@@ -164,6 +172,7 @@ func run(logger *slog.Logger) error {
 			Collector:      collectorOrNil(collector),
 			Classifier:     classifier,
 			ActionPlanner:  actions.NewService(incidentStore, serviceStore),
+			Sandbox:        sandboxService,
 			AlertIntake:    alertIntake,
 			AlertFailures:  alertFailures,
 			AlertSecret:    cfg.AlertmanagerSecret,

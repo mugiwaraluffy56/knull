@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,8 +68,14 @@ type Config struct {
 	GitHubMCPURL   string
 	GitHubMCPToken string
 	// JevMCPURL connects the decision-only server. Empty disables classification.
-	JevMCPURL        string
-	JevMinConfidence float64
+	JevMCPURL             string
+	JevMinConfidence      float64
+	SandboxKubeconfig     string
+	SandboxContext        string
+	SandboxClusterUID     string
+	ProductionClusterUIDs []string
+	SandboxImageRegistry  string
+	SandboxPullSecretName string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -120,6 +127,12 @@ func Load() (Config, error) {
 		GitHubMCPToken:        os.Getenv("KNULL_GITHUB_MCP_TOKEN"),
 		JevMCPURL:             os.Getenv("KNULL_JEV_MCP_URL"),
 		JevMinConfidence:      0.65,
+		SandboxKubeconfig:     os.Getenv("KNULL_SANDBOX_KUBECONFIG"),
+		SandboxContext:        os.Getenv("KNULL_SANDBOX_CONTEXT"),
+		SandboxClusterUID:     os.Getenv("KNULL_SANDBOX_CLUSTER_UID"),
+		ProductionClusterUIDs: strings.Split(os.Getenv("KNULL_PRODUCTION_CLUSTER_UIDS"), ","),
+		SandboxImageRegistry:  os.Getenv("KNULL_SANDBOX_IMAGE_REGISTRY"),
+		SandboxPullSecretName: os.Getenv("KNULL_SANDBOX_PULL_SECRET_NAME"),
 	}
 	if raw := os.Getenv("KNULL_JEV_MIN_CONFIDENCE"); raw != "" {
 		value, err := strconv.ParseFloat(raw, 64)
