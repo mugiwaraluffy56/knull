@@ -431,7 +431,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Stale/expired actions cannot be approved from an old screen state.
 - The UI reflects the backend decision after reload/reconnect.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; frontend typecheck, lint, build, and CI pass. PR/commit: 96c9c85 (live operator flow pending complete integration)
 
 ### 21. Execute an approved memory-limit change
 
