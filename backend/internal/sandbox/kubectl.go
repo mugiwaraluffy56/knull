@@ -236,8 +236,11 @@ func (k Kubectl) VerifyControls(ctx context.Context, namespace string, workload 
 }
 
 func (k Kubectl) DeleteNamespace(ctx context.Context, namespace string) error {
-	_, err := k.command(ctx, nil, "delete", "namespace", namespace, "--wait=true", "--timeout=90s")
-	return err
+	_, err := k.command(ctx, nil, "delete", "namespace", namespace, "--wait=false")
+	if err != nil {
+		return err
+	}
+	return WaitForDeletion(ctx, k, namespace)
 }
 
 func (k Kubectl) NamespaceExists(ctx context.Context, namespace string) (bool, error) {

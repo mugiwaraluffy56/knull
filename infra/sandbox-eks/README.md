@@ -43,7 +43,10 @@ Run only after confirming the AWS account and cost:
 ```sh
 export AWS_PROFILE=<sandbox-admin-profile>
 eksctl create cluster -f infra/sandbox-eks/cluster.yaml
-kubectl --context <new-sandbox-context> get nodes
+aws eks update-kubeconfig --region ap-south-1 --name knull-sandbox \
+  --alias knull-sandbox-admin --kubeconfig <private-directory>/sandbox-admin.kubeconfig
+kubectl --kubeconfig <private-directory>/sandbox-admin.kubeconfig \
+  --context knull-sandbox-admin get nodes
 eksctl delete cluster -f infra/sandbox-eks/cluster.yaml
 ```
 
@@ -53,10 +56,14 @@ After the cluster is ready, apply the runner service account and its limited
 RBAC to the **new sandbox context only**:
 
 ```sh
-kubectl --context <new-sandbox-context> apply -f infra/sandbox-eks/runner-rbac.yaml
+kubectl --kubeconfig <private-directory>/sandbox-admin.kubeconfig \
+  --context knull-sandbox-admin apply -f infra/sandbox-eks/system-network-policy.yaml
+kubectl --kubeconfig <private-directory>/sandbox-admin.kubeconfig \
+  --context knull-sandbox-admin apply -f infra/sandbox-eks/runner-rbac.yaml
 python3 infra/sandbox-eks/make-runner-kubeconfig.py \
   --profile "$AWS_PROFILE" \
-  --admin-context <new-sandbox-context> \
+  --admin-kubeconfig <private-directory>/sandbox-admin.kubeconfig \
+  --admin-context knull-sandbox-admin \
   --output <private-directory>/sandbox-runner.kubeconfig
 ```
 
@@ -70,6 +77,32 @@ credentials. Its Kubernetes RBAC is limited to the resources and verbs its
 current implementation uses, but it applies to all namespaces in this
 dedicated cluster because Kubernetes RBAC cannot restrict namespace creation
 by name prefix.
+
+The kube-system policy is needed because strict CNI mode also starts CoreDNS
+and metrics-server with no network access. Their API connectivity is required
+for healthy add-ons and namespace cleanup. It allows traffic only for
+`kube-system` pods; each `knull-run-*` namespace keeps its own default-deny
+policy.
+
+## Live verification (2026-09-26)
+
+The Mumbai EKS 1.34 cluster had one Ready `m5.large` worker. The VPC CNI
+add-on was active with network policy enabled in strict mode. The restricted
+runner token could read the sandbox cluster UID and create namespaces, but
+`kubectl auth can-i get secrets -A` returned `no`. A pinned checkout fixture
+run reached two healthy pods; `RunWithCheck` returned `checked` with
+`CleanupVerified=true` after the namespace disappeared. The first attempt
+found that `kubectl delete --wait` required namespace list permission; the
+runner now polls the exact namespace for deletion instead. Before the
+`kube-system` allow policy was installed, unhealthy metrics-server API
+discovery prevented cleanup; the policy restored CoreDNS and metrics-server.
+
+A separate `knull-netprobe` namespace proved the data-plane rule: a BusyBox
+pod could not resolve or fetch `example.com` under default-deny egress, then
+fetched it after an allow-egress policy was added. The probe namespace was
+deleted. No production cluster was supplied for a cross-cluster API denial
+probe; the runner kubeconfig contains only the sandbox endpoint and a
+short-lived service-account token issued by this cluster.
 
 Before enabling Knull's sandbox runner, verify the VPC CNI add-on is active
 with network policy enabled and strict enforcement, run a network-denial

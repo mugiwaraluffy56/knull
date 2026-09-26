@@ -15,6 +15,7 @@ def command(*args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True, help="AWS profile for cluster lookup")
+    parser.add_argument("--admin-kubeconfig", required=True, help="bootstrap kubeconfig path")
     parser.add_argument("--admin-context", required=True, help="bootstrap kubectl context")
     parser.add_argument("--output", required=True, help="new kubeconfig path")
     args = parser.parse_args()
@@ -24,14 +25,16 @@ def main():
         "--region", "ap-south-1", "--name", "knull-sandbox", "--output", "json",
     ))["cluster"]
     admin = json.loads(command(
-        "kubectl", "config", "view", "--raw", "--minify", "--context",
+        "kubectl", "--kubeconfig", args.admin_kubeconfig,
+        "config", "view", "--raw", "--minify", "--context",
         args.admin_context, "-o", "json",
     ))
     if admin["clusters"][0]["cluster"]["server"] != cluster["endpoint"]:
         parser.error("admin context does not target the dedicated sandbox cluster")
 
     token = command(
-        "kubectl", "--context", args.admin_context, "-n", "knull-system",
+        "kubectl", "--kubeconfig", args.admin_kubeconfig,
+        "--context", args.admin_context, "-n", "knull-system",
         "create", "token", "sandbox-runner", "--duration=1h",
     )
     kubeconfig = {
