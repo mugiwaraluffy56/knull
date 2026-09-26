@@ -24,6 +24,7 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/investigate"
 	"github.com/mugiwaraluffy56/knull/backend/internal/mcp"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
+	"github.com/mugiwaraluffy56/knull/backend/internal/respond"
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
 	"github.com/mugiwaraluffy56/knull/backend/internal/store"
@@ -113,7 +114,9 @@ func run(logger *slog.Logger) error {
 	}
 	var classifier *classify.Service
 	if cfg.JevMCPURL != "" {
-		classifier = classify.NewService(incidentStore, &classify.MCPClient{Endpoint: cfg.JevMCPURL}, cfg.JevMinConfidence)
+		jevClient := &classify.MCPClient{Endpoint: cfg.JevMCPURL}
+		classifier = classify.NewService(incidentStore, jevClient, cfg.JevMinConfidence)
+		classifier.SetNext(respond.NewService(incidentStore, jevClient, cfg.JevMinConfidence))
 		logger.Info("Jev classification enabled", "url", cfg.JevMCPURL)
 	}
 

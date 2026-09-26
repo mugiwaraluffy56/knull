@@ -23,10 +23,11 @@ type Evidence struct {
 }
 
 type Input struct {
-	Evidence  []Evidence `json:"evidence"`
-	ActionRef string     `json:"action_ref,omitempty"`
-	Action    string     `json:"action,omitempty"`
-	Signals   []string   `json:"signals,omitempty"`
+	Evidence       []Evidence      `json:"evidence"`
+	Classification *Classification `json:"classification,omitempty"`
+	ActionRef      string          `json:"action_ref,omitempty"`
+	Action         string          `json:"action,omitempty"`
+	Signals        []string        `json:"signals,omitempty"`
 }
 
 type Metadata struct {
@@ -251,6 +252,13 @@ func validateInput(in Input) error {
 	}
 	if len(in.Action) > 2000 || len(in.Signals) > 30 {
 		return fmt.Errorf("%w: action or signal budget exceeded", ErrInvalidInput)
+	}
+	if in.Classification != nil {
+		for _, h := range in.Classification.Classes {
+			if err := validateReferences(in, h.EvidenceIDs); err != nil {
+				return fmt.Errorf("%w: classification references unavailable evidence", ErrInvalidInput)
+			}
+		}
 	}
 	return nil
 }

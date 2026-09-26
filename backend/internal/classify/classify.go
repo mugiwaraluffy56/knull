@@ -33,6 +33,15 @@ type Service struct {
 	store         Store
 	decider       Decider
 	minConfidence float64
+	next          interface {
+		Next(context.Context, uuid.UUID) (jev.NextActionResult, error)
+	}
+}
+
+func (s *Service) SetNext(next interface {
+	Next(context.Context, uuid.UUID) (jev.NextActionResult, error)
+}) {
+	s.next = next
 }
 
 func NewService(store Store, decider Decider, minConfidence float64) *Service {
@@ -87,6 +96,10 @@ func (s *Service) Classify(ctx context.Context, id uuid.UUID) (jev.Classificatio
 	leading := result.Decision.Classes[0]
 	if leading.Class == "UNKNOWN" || leading.Confidence < s.minConfidence || len(leading.EvidenceIDs) == 0 {
 		s.escalate(ctx, inc, "classification uncertain or unsupported")
+	} else if s.next != nil {
+		if _, err := s.next.Next(ctx, id); err != nil {
+			return result, err
+		}
 	}
 	return result, nil
 }

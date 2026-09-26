@@ -135,6 +135,7 @@ export default function IncidentPage({
                   {e.source === "prometheus" && <PrometheusFinding event={e} />}
                   {e.source === "github" && <GitHubFinding event={e} />}
                   {e.source === "jev" && <JevClassification event={e} />}
+                  {(e.source === "jev-next-action" || e.source === "jev-risk") && <JevDecision event={e} />}
                 </div>
                 <span className="timeline-time">
                   {new Date(e.observedAt ?? e.createdAt).toLocaleString()}
@@ -166,6 +167,19 @@ function JevClassification({ event }: { event: IncidentEvent }) {
     </div>)}
     {decision.rationale && <div>Hypothesis summary: {decision.rationale}</div>}
     {metadata && <div className="auth-muted">{metadata.model} · {metadata.decision_version} · {metadata.calibrated ? "calibrated" : "uncalibrated confidence"}</div>}
+  </div>;
+}
+
+function JevDecision({ event }: { event: IncidentEvent }) {
+  const decision = event.data?.decision as { action?: string; risk?: string; rationale?: string; confidence?: number; evidence_ids?: string[]; action_ref?: string } | undefined;
+  if (!decision) return null;
+  return <div className="metric-finding">
+    <strong>{event.source === "jev-risk" ? "Proposed action risk" : "Next response step"}</strong>: {decision.risk ?? decision.action ?? "unavailable"}
+    {decision.rationale && <div>{decision.rationale}</div>}
+    {typeof decision.confidence === "number" && <div>{Math.round(decision.confidence * 100)}% model confidence</div>}
+    {Array.isArray(decision.evidence_ids) && decision.evidence_ids.length > 0 && <div>Evidence: {decision.evidence_ids.map((id, index) => <span key={id}>{index > 0 ? ", " : ""}<a href={`#event-${id}`}>{id.slice(0, 8)}</a></span>)}</div>}
+    {decision.action_ref && <div>Proposed action: <a href={`#event-${decision.action_ref}`}>{decision.action_ref.slice(0, 8)}</a></div>}
+    <div className="auth-muted">Recommendation only · production changes require approval.</div>
   </div>;
 }
 

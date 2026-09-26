@@ -120,9 +120,14 @@ model, timeout, retry, and request/output-token limits. The server exposes only
 the four decision tools below and sends incident evidence to the configured
 OpenAI model. Keep the server on a trusted network and put authentication at
 the ingress if remote MCP clients need access.
+
 Set `KNULL_JEV_MCP_URL=http://127.0.0.1:8090/mcp` on the incident API to
 classify freshly collected evidence. The API records ranked hypotheses with
 links to observation events and escalates unknown or low-confidence results.
+For supported hypotheses, Jev also suggests the next response step. The API
+records that decision and may enter planning, but no recommendation can approve
+or run a production change. Risk classification requires a stored proposed
+action and leaves the incident in planning.
 
 ### What Jev decides
 

@@ -66,6 +66,12 @@ type fakeDecider struct {
 	err    error
 	input  jev.Input
 }
+type nextStub struct{ called bool }
+
+func (n *nextStub) Next(context.Context, uuid.UUID) (jev.NextActionResult, error) {
+	n.called = true
+	return jev.NextActionResult{}, nil
+}
 
 func (d *fakeDecider) Classify(_ context.Context, input jev.Input) (jev.ClassificationResult, error) {
 	d.input = input
@@ -81,8 +87,14 @@ func TestClassificationUsesStoredEvidenceAndEscalatesUnknown(t *testing.T) {
 		{ID: uuid.New(), Category: incidents.CategoryObservation, Source: "github", Data: map[string]any{"available": false}},
 	}}
 	d := &fakeDecider{result: jev.ClassificationResult{Decision: jev.Classification{Classes: []jev.Hypothesis{{Class: "RESOURCE_EXHAUSTION", Confidence: 0.9, EvidenceIDs: []string{evidenceID.String(), changeID.String()}}}, Rationale: "OOM after memory limit cut"}, Metadata: jev.Metadata{Model: "test", DecisionVersion: "jev-v1"}}}
-	if _, err := NewService(s, d, 0.65).Classify(context.Background(), s.inc.ID); err != nil {
+	classifier := NewService(s, d, 0.65)
+	next := &nextStub{}
+	classifier.SetNext(next)
+	if _, err := classifier.Classify(context.Background(), s.inc.ID); err != nil {
 		t.Fatal(err)
+	}
+	if !next.called {
+		t.Fatal("next decision was not requested")
 	}
 	if len(d.input.Evidence) != 2 || d.input.Evidence[0].ID != evidenceID.String() || d.input.Evidence[1].ID != changeID.String() {
 		t.Fatalf("wrong input: %+v", d.input)
@@ -95,8 +107,12 @@ func TestClassificationUsesStoredEvidenceAndEscalatesUnknown(t *testing.T) {
 		t.Fatalf("wrong stored references: %v", refs)
 	}
 	d.result.Decision.Classes = []jev.Hypothesis{{Class: "UNKNOWN", Confidence: 0.8}}
-	if _, err := NewService(s, d, 0.65).Classify(context.Background(), s.inc.ID); err != nil {
+	next.called = false
+	if _, err := classifier.Classify(context.Background(), s.inc.ID); err != nil {
 		t.Fatal(err)
+	}
+	if next.called {
+		t.Fatal("unknown classification requested a next action")
 	}
 	if s.inc.State != incidents.StateEscalated {
 		t.Fatalf("unknown class did not escalate: %s", s.inc.State)

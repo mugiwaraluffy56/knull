@@ -18,26 +18,49 @@ type MCPClient struct {
 }
 
 func (c *MCPClient) Classify(ctx context.Context, input jev.Input) (jev.ClassificationResult, error) {
+	var decision jev.ClassificationResult
+	if err := c.call(ctx, "classify_incident", input, &decision); err != nil {
+		return jev.ClassificationResult{}, err
+	}
+	return decision, nil
+}
+
+func (c *MCPClient) SelectNextAction(ctx context.Context, input jev.Input) (jev.NextActionResult, error) {
+	var decision jev.NextActionResult
+	if err := c.call(ctx, "select_next_action", input, &decision); err != nil {
+		return jev.NextActionResult{}, err
+	}
+	return decision, nil
+}
+
+func (c *MCPClient) ClassifyRisk(ctx context.Context, input jev.Input) (jev.RiskResult, error) {
+	var decision jev.RiskResult
+	if err := c.call(ctx, "classify_remediation_risk", input, &decision); err != nil {
+		return jev.RiskResult{}, err
+	}
+	return decision, nil
+}
+
+func (c *MCPClient) call(ctx context.Context, name string, input jev.Input, out any) error {
 	client := mcp.NewClient(&mcp.Implementation{Name: "knull-backend", Version: "1"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: c.Endpoint, HTTPClient: c.HTTPClient, DisableStandaloneSSE: true, MaxRetries: -1}, nil)
 	if err != nil {
-		return jev.ClassificationResult{}, fmt.Errorf("connect Jev MCP: %w", err)
+		return fmt.Errorf("connect Jev MCP: %w", err)
 	}
 	defer session.Close()
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "classify_incident", Arguments: input})
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: input})
 	if err != nil {
-		return jev.ClassificationResult{}, fmt.Errorf("call Jev: %w", err)
+		return fmt.Errorf("call Jev: %w", err)
 	}
 	if result.IsError {
-		return jev.ClassificationResult{}, fmt.Errorf("Jev classification failed: %v", result.StructuredContent)
+		return fmt.Errorf("Jev decision failed: %v", result.StructuredContent)
 	}
 	encoded, err := json.Marshal(result.StructuredContent)
 	if err != nil {
-		return jev.ClassificationResult{}, fmt.Errorf("encode Jev response: %w", err)
+		return fmt.Errorf("encode Jev response: %w", err)
 	}
-	var decision jev.ClassificationResult
-	if err := json.Unmarshal(encoded, &decision); err != nil {
-		return jev.ClassificationResult{}, fmt.Errorf("decode Jev response: %w", err)
+	if err := json.Unmarshal(encoded, out); err != nil {
+		return fmt.Errorf("decode Jev response: %w", err)
 	}
-	return decision, nil
+	return nil
 }
