@@ -208,10 +208,16 @@ Docker with Compose.
 ```bash
 make deps          # install backend and frontend dependencies
 make up            # start PostgreSQL, Redis, and Keycloak, wait until healthy
-export KNULL_SECRET_KEY=$(openssl rand -base64 32)   # enables credential storage
+set -a; source backend/.env.example; set +a # load local backend defaults
+export KNULL_SECRET_KEY="$(openssl rand -base64 32)" # enables credential storage
+make migrate       # create the local database schema
 make dev-api       # terminal 1: Go incident API on http://localhost:8080
 make dev-web       # terminal 2: Next.js UI on http://localhost:3000
 ```
+
+`backend/.env.example` contains safe local defaults and blank integration
+credentials. Set any provider keys in your shell or a private environment file;
+never commit real secrets.
 
 Open the UI: the home page is a health page that shows whether the API,
 PostgreSQL, and Redis are reachable. Backend health endpoints are
@@ -288,3 +294,7 @@ Read [`docs/PRD.md`](docs/PRD.md) for the product brief and
 architecture. Use [`docs/IMPLEMENT.md`](docs/IMPLEMENT.md) to track delivery.
 
 Please sign off your commits with `git commit -s`.
+
+## License
+
+Knull is available under the [MIT License](LICENSE).
