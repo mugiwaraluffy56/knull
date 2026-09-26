@@ -32,7 +32,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Backend and frontend build checks pass in CI.
 - The UI can reach the backend health endpoint and display its status.
 
-**Completion:** [x] Code pushed; verification passes. PR/commit: 7276688
+**Completion:** [x] Code pushed; verification passes. PR/commit: 0340fc6
 
 ### 2. Add operator identity and integration secret handling
 
