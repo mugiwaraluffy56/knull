@@ -1,35 +1,38 @@
-# Knull solution
+# Solution Writeup: Knull
 
-## Problem
+**The problem.** Engineers jump between Kubernetes, metrics, logs, and deploy
+history to diagnose production incidents and choose safe fixes. Manual
+correlation is slow and risky.
 
-During a production incident, engineers jump between Kubernetes, metrics,
-logs, and deployment history to find the cause and decide what is safe to do.
-That manual investigation is slow, hard to repeat, and easy to get wrong under
-pressure.
+**What the agent reaches.** When configured, Knull gathers workload-scoped evidence through
+read-only Kubernetes, Prometheus, and GitHub MCP connections. Jev turns those
+observations into typed hypotheses and a proposed next step. For the supported
+memory remediation, TrueForge can author bounded validation code and run it in
+a separate EKS sandbox. Knull records the evidence, action, and validation
+result for operator review.
 
-## What the agent reaches—and where it stops
+**Where it stops.** The agent stops before changing production. A person must
+approve the exact action, target, and values. The backend checks that approval
+and the live resource preconditions before execution, then observes recovery.
+Stale or uncertain actions are blocked or escalated.
 
-Knull uses TrueForge to run a durable investigation. It gathers scoped,
-read-only evidence from Kubernetes, Prometheus, and GitHub through MCP. Jev
-turns that evidence into typed hypotheses and a proposed next step. For a
-supported remediation, TrueForge can author bounded validation code and run it
-in a separate EKS sandbox. Knull records the evidence, proposal, and validation
-result for the operator to review.
+**Architecture.** A Go API stores incidents and events in PostgreSQL and Redis.
+TrueForge manages investigations; read-only MCP tools collect evidence. Jev is
+a Go MCP service using a configured OpenAI-compatible model. The Next.js UI
+presents the fleet, timeline, sandbox result, approval, and recovery. A typed
+backend executor owns production writes. The sandbox uses a separate EKS
+cluster.
 
-The agent stops before changing production. A person must approve the exact
-action, target, and expected values. The backend rechecks approval and live
-resource preconditions before execution, then observes recovery. A stale or
-uncertain action is blocked or escalated. The bad-deployment rollback and
-traffic-spike paths are still under implementation; they are not represented as
-completed end-to-end flows.
+**How TrueForge was used.** TrueForge provides the durable agent workflow and
+validation-code authoring. Knull connects it to the incident timeline and
+isolated EKS validation runner. Production credentials stay outside the agent
+workflow.
 
-## Architecture
+**Real vs mocked.** Code exists for the app, API, integrations, Jev, and EKS
+sandbox path. A separate sandbox exercise reproduced the checkout memory
+failure at 256Mi and passed 20 of 20 requests at 1Gi. This was not a fresh
+end-to-end run through the app and TrueForge.
 
-The Go API stores incidents and ordered events in PostgreSQL, with Redis for
-supporting runtime state. TrueForge manages the investigation; read-only MCP
-connectors provide infrastructure evidence. Jev is a separate Go MCP service
-using a customer-configured OpenAI-compatible model API. The Next.js operator
-UI presents the fleet, evidence timeline, sandbox result, approval gate, and
-recovery status. A typed backend executor owns production writes; agent tools
-do not receive production mutation credentials. The sandbox uses a separate
-customer-controlled EKS cluster.
+**Known limits.** The live TrueForge, MCP, and Jev connections are not verified
+as one complete run. Bad-deployment rollback and traffic-spike remediation are
+still incomplete. Do not present persisted test fixtures as live incidents.
