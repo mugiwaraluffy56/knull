@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -17,6 +18,78 @@ type Kubectl struct {
 	Binary     string
 	Kubeconfig string
 	Context    string
+}
+
+type PodStatus struct {
+	Desired    int
+	Healthy    int
+	OOMKills   int
+	ObservedAt time.Time
+}
+
+type terminatedStatus struct {
+	Reason string `json:"reason"`
+}
+
+var runNamespace = regexp.MustCompile(`^knull-run-[a-f0-9]{20}$`)
+
+// ReadPodStatus reads only the isolated run namespace through the sandbox
+// kubeconfig. It does not infer health from a generated validation script.
+func (k Kubectl) ReadPodStatus(ctx context.Context, namespace string) (PodStatus, error) {
+	if !runNamespace.MatchString(namespace) {
+		return PodStatus{}, fmt.Errorf("%w: invalid run namespace", ErrIsolation)
+	}
+	deployment, err := k.getObject(ctx, "deployment", "candidate", namespace)
+	if err != nil {
+		return PodStatus{}, err
+	}
+	replicas, ok := nested(deployment, "spec", "replicas").(float64)
+	if !ok || replicas < 1 || replicas > 6 || replicas != float64(int(replicas)) {
+		return PodStatus{}, fmt.Errorf("%w: invalid desired replicas", ErrIsolation)
+	}
+	data, err := k.command(ctx, nil, "get", "pods", "-n", namespace, "-l", "app.kubernetes.io/managed-by=knull", "-o", "json")
+	if err != nil {
+		return PodStatus{}, err
+	}
+	return parsePodStatus(int(replicas), data)
+}
+
+func parsePodStatus(desired int, data []byte) (PodStatus, error) {
+	var list struct {
+		Items []struct {
+			Status struct {
+				Phase             string `json:"phase"`
+				ContainerStatuses []struct {
+					Ready     bool `json:"ready"`
+					LastState struct {
+						Terminated *terminatedStatus `json:"terminated"`
+					} `json:"lastState"`
+					State struct {
+						Terminated *terminatedStatus `json:"terminated"`
+					} `json:"state"`
+				} `json:"containerStatuses"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(data, &list); err != nil {
+		return PodStatus{}, err
+	}
+	result := PodStatus{Desired: desired, ObservedAt: time.Now().UTC()}
+	for _, pod := range list.Items {
+		if len(pod.Status.ContainerStatuses) != 1 {
+			continue
+		}
+		container := pod.Status.ContainerStatuses[0]
+		if pod.Status.Phase == "Running" && container.Ready {
+			result.Healthy++
+		}
+		for _, terminated := range []*terminatedStatus{container.LastState.Terminated, container.State.Terminated} {
+			if terminated != nil && terminated.Reason == "OOMKilled" {
+				result.OOMKills++
+			}
+		}
+	}
+	return result, nil
 }
 
 func (k Kubectl) command(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
