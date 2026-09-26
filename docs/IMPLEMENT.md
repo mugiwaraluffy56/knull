@@ -323,7 +323,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Missing or invalid Jev decisions stop progression and escalate.
 - All risk levels still require the approval workflow before production mutation.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [x] Code pushed; CI passed. PR/commit: 4a90823 (live Jev model call pending)
 
 ### 16. Create bounded remediation plans
 
