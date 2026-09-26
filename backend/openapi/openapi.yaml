@@ -523,6 +523,56 @@ paths:
                   error: { type: string }
                   result: { $ref: "#/components/schemas/MemoryValidationResult" }
         "503": { description: Validation dependencies not configured. }
+  /api/incidents/{id}/approvals:
+    post:
+      operationId: approveAction
+      summary: Approve one validated action for 15 minutes
+      description: Records the signed-in operator and exact sealed action digest. Production remains unchanged until the backend execution gate checks the live precondition.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionDecisionRequest"
+      responses:
+        "201":
+          description: Action-specific approval recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionDecision"
+        "400": { description: Invalid request. }
+        "401": { description: Authentication required. }
+        "404": { description: Incident not found. }
+        "409": { description: Action was not eligible or was already decided. }
+        "503": { description: Approval service unavailable. }
+  /api/incidents/{id}/denials:
+    post:
+      operationId: denyAction
+      summary: Deny one validated action
+      description: Records the signed-in operator and optional reason, then atomically moves the incident to DENIED.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionDecisionRequest"
+      responses:
+        "201":
+          description: Action-specific denial recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionDecision"
+        "400": { description: Invalid request. }
+        "401": { description: Authentication required. }
+        "404": { description: Incident not found. }
+        "409": { description: Action was not eligible or was already decided. }
+        "503": { description: Approval service unavailable. }
 components:
   parameters:
     ServiceId:
@@ -540,6 +590,28 @@ components:
         type: string
         format: uuid
   schemas:
+    ActionDecisionRequest:
+      type: object
+      required: [actionEventId, actionDigest]
+      properties:
+        actionEventId: { type: string, format: uuid }
+        actionDigest: { type: string }
+        reason: { type: string, maxLength: 500 }
+    ActionDecision:
+      type: object
+      required: [id, incidentId, actionEventId, actionDigest, decision, operatorId, operatorEmail, decidedAt]
+      properties:
+        id: { type: string, format: uuid }
+        incidentId: { type: string, format: uuid }
+        actionEventId: { type: string, format: uuid }
+        actionDigest: { type: string }
+        decision: { type: string, enum: [APPROVED, DENIED] }
+        operatorId: { type: string, format: uuid }
+        operatorEmail: { type: string }
+        reason: { type: string }
+        decidedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        invalidatedAt: { type: string, format: date-time }
     SandboxWorkload:
       type: object
       required: [imageDigest, container, replicas, cpu, memory]

@@ -155,11 +155,16 @@ func TestConcurrentTransitionsSerialized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Two racing terminal-ish transitions from AWAITING_APPROVAL: approve vs
-	// deny. The row lock serializes them; exactly one must win.
+	// A generic transition may never claim approval or production execution.
+	if _, err := store.Transition(ctx, inc.ID, Transition{To: StateRemediating, Actor: "workflow"}); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("generic remediation transition = %v, want ErrInvalidTransition", err)
+	}
+
+	// Two racing allowed transitions from AWAITING_APPROVAL: return to planning
+	// or deny. The row lock serializes them; exactly one must win.
 	var wg sync.WaitGroup
 	results := make([]error, 2)
-	targets := []State{StateRemediating, StateDenied}
+	targets := []State{StatePlanning, StateDenied}
 	wg.Add(2)
 	for i := range 2 {
 		go func(i int) {

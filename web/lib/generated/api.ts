@@ -351,10 +351,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidents/{id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve one validated action for 15 minutes
+         * @description Records the signed-in operator and exact sealed action digest. Production remains unchanged until the backend execution gate checks the live precondition.
+         */
+        post: operations["approveAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/incidents/{id}/denials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny one validated action
+         * @description Records the signed-in operator and optional reason, then atomically moves the incident to DENIED.
+         */
+        post: operations["denyAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActionDecisionRequest: {
+            /** Format: uuid */
+            actionEventId: string;
+            actionDigest: string;
+            reason?: string;
+        };
+        ActionDecision: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            incidentId: string;
+            /** Format: uuid */
+            actionEventId: string;
+            actionDigest: string;
+            /** @enum {string} */
+            decision: "APPROVED" | "DENIED";
+            /** Format: uuid */
+            operatorId: string;
+            operatorEmail: string;
+            reason?: string;
+            /** Format: date-time */
+            decidedAt: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** Format: date-time */
+            invalidatedAt?: string;
+        };
         SandboxWorkload: {
             imageDigest: string;
             container: string;
@@ -1436,6 +1503,128 @@ export interface operations {
                 };
             };
             /** @description Validation dependencies not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    approveAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Action-specific approval recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionDecision"];
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Action was not eligible or was already decided. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Approval service unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    denyAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IncidentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Action-specific denial recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionDecision"];
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Incident not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Action was not eligible or was already decided. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Approval service unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;

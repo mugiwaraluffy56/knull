@@ -398,7 +398,7 @@ Example confidence estimates and specific before/after error rates or latency in
 - What Jev model/version provides each decision, and how are probabilities calibrated?
 - Which confidence/risk thresholds trigger more investigation or escalation? These thresholds must not bypass human approval.
 - What per-service recovery windows and signal thresholds define recovery?
-- What approval expiry is required? The installation runs in the customer account; its Kubernetes service accounts and RBAC must separate read, sandbox, and production mutation capabilities.
+- Approval expires 15 minutes after the operator approves the exact action. An expired approval requires a new plan, sandbox validation, and operator decision. The installation runs in the customer account; its Kubernetes service accounts and RBAC must separate read, sandbox, and production mutation capabilities.
 - Which AWS workload identity configuration is required for optional AWS API integrations, and which exact outbound destinations must customers allow?
 - What OpenAI data-retention and regional requirements apply to customer incident evidence sent through the configured API credential?
 - What is the event and raw-log retention policy, and which fields require redaction?

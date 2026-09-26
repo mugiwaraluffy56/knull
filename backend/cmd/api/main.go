@@ -17,6 +17,7 @@ import (
 
 	"github.com/mugiwaraluffy56/knull/backend/internal/actions"
 	"github.com/mugiwaraluffy56/knull/backend/internal/alerts"
+	"github.com/mugiwaraluffy56/knull/backend/internal/approval"
 	"github.com/mugiwaraluffy56/knull/backend/internal/auth"
 	"github.com/mugiwaraluffy56/knull/backend/internal/classify"
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
@@ -180,6 +181,7 @@ func run(logger *slog.Logger) error {
 			Collector:       collectorOrNil(collector),
 			Classifier:      classifier,
 			ActionPlanner:   actions.NewService(incidentStore, serviceStore),
+			Approvals:       approval.NewService(st.Pool),
 			Sandbox:         sandboxService,
 			MemoryValidator: memoryValidator,
 			AlertIntake:     alertIntake,

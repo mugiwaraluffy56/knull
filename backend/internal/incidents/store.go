@@ -176,6 +176,11 @@ func (s *Store) Transition(ctx context.Context, id uuid.UUID, t Transition) (Inc
 		if !current.CanTransition(t.To) {
 			return fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, current, t.To)
 		}
+		// The production transition belongs exclusively to approval.Service's
+		// atomic claim. Workflow events cannot grant mutation authority.
+		if t.To == StateRemediating {
+			return fmt.Errorf("%w: remediation requires the approval gate", ErrInvalidTransition)
+		}
 
 		var seq int64
 		if err := tx.QueryRow(ctx,

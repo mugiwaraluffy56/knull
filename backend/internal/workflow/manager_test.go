@@ -198,7 +198,7 @@ func TestResumeSelectsOnlyActiveWithSession(t *testing.T) {
 	// A closed incident with a session must not be resumable.
 	closed := newInc(t, store)
 	_ = store.SaveWorkflow(ctx, closed.ID, "sess-y", "run-y")
-	for _, to := range []incidents.State{incidents.StateInvestigating, incidents.StatePlanning, incidents.StateValidating, incidents.StateAwaitingApproval, incidents.StateRemediating, incidents.StateVerifying, incidents.StateRecovered, incidents.StateClosed} {
+	for _, to := range []incidents.State{incidents.StateInvestigating, incidents.StatePlanning, incidents.StateValidating, incidents.StateAwaitingApproval, incidents.StateDenied, incidents.StateClosed} {
 		if _, err := store.Transition(ctx, closed.ID, incidents.Transition{To: to, Actor: "t"}); err != nil {
 			t.Fatalf("advance to %s: %v", to, err)
 		}
