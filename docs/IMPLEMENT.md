@@ -367,7 +367,7 @@ This checklist turns [`docs/SPEC.md`](docs/SPEC.md) into 30 build tasks in depen
 - Failed cleanup, policy enforcement, network isolation, or cluster identity checks make validation fail and block production approval.
 - The incident links to the sandbox run and its evidence.
 
-**Completion:** [ ] Code pushed; verification passes. PR/commit: ____________________
+**Completion:** [ ] Code pushed; CI passes. Dedicated EKS isolation and cleanup verification pending. PR/commit: ddb1bee
 
 ### 18. Validate the primary memory-limit remediation
 
