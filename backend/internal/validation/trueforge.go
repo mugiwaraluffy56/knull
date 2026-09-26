@@ -49,7 +49,7 @@ func NewTrueForgeScriptEngine(config TrueForgeConfig) *TrueForgeScriptEngine {
 }
 
 var validationNamespace = regexp.MustCompile(`^knull-run-[a-f0-9]{20}$`)
-var validationDigest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+var validationDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func (e *TrueForgeScriptEngine) GenerateAndExecute(ctx context.Context, req ScriptRequest) (ScriptResult, error) {
 	if e == nil || e.config.Executor == nil || e.client == nil {

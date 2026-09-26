@@ -62,7 +62,7 @@ func TestVersionedPolicyAndAssessmentSnapshot(t *testing.T) {
 	if err != nil || historic.Digest != first.Digest {
 		t.Fatalf("historic version: %+v, %v", historic, err)
 	}
-	start := time.Now().Add(-6 * time.Minute).UTC()
+	start := time.Now().Add(-6 * time.Minute).UTC().Truncate(time.Microsecond)
 	missing := Observation{WindowStart: start, WindowEnd: start.Add(5 * time.Minute)}
 	id, assessment, err := s.RecordAssessment(ctx, incidentID, historic, missing)
 	if err != nil || id == uuid.Nil || assessment.Outcome == Recovered {

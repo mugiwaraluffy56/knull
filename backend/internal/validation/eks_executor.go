@@ -35,12 +35,13 @@ func NewKubernetesCodeExecutor(config EKSExecutorConfig) *KubernetesCodeExecutor
 }
 
 var pinnedExecutorImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]+@sha256:[a-f0-9]{64}$`)
+var codeArtifactDigest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
 func (e *KubernetesCodeExecutor) Execute(ctx context.Context, request ScriptRequest, code, artifact string) (CodeExecution, error) {
 	if e == nil || e.config.Kubeconfig == "" || e.config.Context == "" || e.config.ClusterUID == "" ||
 		e.config.AllowedImageRegistry == "" || !pinnedExecutorImage.MatchString(e.config.ImageDigest) ||
 		!strings.HasPrefix(e.config.ImageDigest, e.config.AllowedImageRegistry+"/") ||
-		!validationNamespace.MatchString(request.Namespace) || !validationDigest.MatchString(artifact) ||
+		!validationNamespace.MatchString(request.Namespace) || !codeArtifactDigest.MatchString(artifact) ||
 		len(code) == 0 || len(code) > 12*1024 {
 		return CodeExecution{}, fmt.Errorf("%w: EKS executor isolation configuration incomplete", ErrFailed)
 	}
