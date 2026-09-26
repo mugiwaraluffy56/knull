@@ -224,6 +224,22 @@ export async function fetchIncident(id: string): Promise<Incident | null> {
   return (await res.json()) as Incident;
 }
 
+// collectEvidence triggers read-only investigation for an incident. Returns an
+// error message on failure, or null on success.
+export async function collectEvidence(id: string): Promise<string | null> {
+  const res = await fetch(`${API_BASE_URL}/api/incidents/${id}/collect`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.ok) return null;
+  try {
+    const body = (await res.json()) as { error?: string };
+    return body.error ?? `request failed (${res.status})`;
+  } catch {
+    return `request failed (${res.status})`;
+  }
+}
+
 // fetchIncidentEvents returns an incident's ordered audit history.
 export async function fetchIncidentEvents(id: string): Promise<IncidentEvent[]> {
   const res = await fetch(`${API_BASE_URL}/api/incidents/${id}/events`, {

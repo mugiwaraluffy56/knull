@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  collectEvidence,
   fetchIncident,
   fetchIncidentEvents,
   type Incident,
@@ -21,6 +22,8 @@ export default function IncidentPage({
   const [incident, setIncident] = useState<Incident | null>(null);
   const [events, setEvents] = useState<IncidentEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [collecting, setCollecting] = useState(false);
+  const [collectMsg, setCollectMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [inc, evs] = await Promise.all([
@@ -85,6 +88,24 @@ export default function IncidentPage({
             ))}
           </ul>
         )}
+
+        <div className="incident-actions">
+          <button
+            className="btn btn-ghost"
+            disabled={collecting}
+            onClick={async () => {
+              setCollecting(true);
+              setCollectMsg(null);
+              const err = await collectEvidence(id);
+              setCollecting(false);
+              setCollectMsg(err ?? "Evidence collected");
+              await load();
+            }}
+          >
+            {collecting ? "Collecting…" : "Collect evidence"}
+          </button>
+          {collectMsg && <span className="auth-muted"> {collectMsg}</span>}
+        </div>
 
         <h2 className="section-title">Timeline</h2>
         {events.length === 0 ? (

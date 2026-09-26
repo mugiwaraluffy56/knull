@@ -41,6 +41,7 @@ type Options struct {
 	Incidents      incidentStore
 	FleetIncidents fleetIncidentSource
 	Workflow       workflowStarter
+	Collector      evidenceCollector
 	AlertIntake    alertIntake
 	AlertFailures  failureRecorder
 	AlertSecret    string
@@ -62,6 +63,7 @@ type Server struct {
 	incidents      incidentStore
 	fleetIncidents fleetIncidentSource
 	workflow       workflowStarter
+	collector      evidenceCollector
 	alertIntake    alertIntake
 	alertFailures  failureRecorder
 	alertSecret    string
@@ -90,6 +92,7 @@ func New(opts Options) *Server {
 		incidents:      opts.Incidents,
 		fleetIncidents: opts.FleetIncidents,
 		workflow:       opts.Workflow,
+		collector:      opts.Collector,
 		alertIntake:    opts.AlertIntake,
 		alertFailures:  opts.AlertFailures,
 		alertSecret:    opts.AlertSecret,
@@ -129,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/incidents", s.requireOperator(http.HandlerFunc(s.handleStartInvestigation)))
 	mux.Handle("GET /api/incidents/{id}", s.requireOperator(http.HandlerFunc(s.handleGetIncident)))
 	mux.Handle("GET /api/incidents/{id}/events", s.requireOperator(http.HandlerFunc(s.handleListIncidentEvents)))
+	mux.Handle("POST /api/incidents/{id}/collect", s.requireOperator(http.HandlerFunc(s.handleCollectEvidence)))
 
 	return s.withCORS(mux)
 }

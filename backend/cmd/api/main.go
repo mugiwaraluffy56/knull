@@ -20,6 +20,8 @@ import (
 	"github.com/mugiwaraluffy56/knull/backend/internal/config"
 	"github.com/mugiwaraluffy56/knull/backend/internal/httpapi"
 	"github.com/mugiwaraluffy56/knull/backend/internal/incidents"
+	"github.com/mugiwaraluffy56/knull/backend/internal/investigate"
+	"github.com/mugiwaraluffy56/knull/backend/internal/mcp"
 	"github.com/mugiwaraluffy56/knull/backend/internal/operators"
 	"github.com/mugiwaraluffy56/knull/backend/internal/secrets"
 	"github.com/mugiwaraluffy56/knull/backend/internal/services"
@@ -79,6 +81,16 @@ func run(logger *slog.Logger) error {
 		logger.Warn("KNULL_TRUEFORGE_URL not set; durable investigations are disabled")
 	}
 
+	var collector *investigate.Collector
+	if cfg.K8sMCPURL != "" {
+		k8sClient := mcp.NewClient(mcp.NewHTTPTransport(cfg.K8sMCPURL, cfg.K8sMCPToken))
+		k8sInv := investigate.NewKubernetesInvestigator(k8sClient)
+		collector = investigate.NewCollector(incidentStore, serviceStore, k8sInv)
+		logger.Info("kubernetes mcp investigation enabled", "url", cfg.K8sMCPURL)
+	} else {
+		logger.Warn("KNULL_K8S_MCP_URL not set; kubernetes investigation is disabled")
+	}
+
 	var cipher *secrets.Cipher
 	if cfg.SecretKey != "" {
 		cipher, err = secrets.NewCipher(cfg.SecretKey)
@@ -119,6 +131,7 @@ func run(logger *slog.Logger) error {
 			Incidents:      incidentStore,
 			FleetIncidents: incidentStore,
 			Workflow:       workflowStarterOrNil(workflowManager),
+			Collector:      collectorOrNil(collector),
 			AlertIntake:    alertIntake,
 			AlertFailures:  alertFailures,
 			AlertSecret:    cfg.AlertmanagerSecret,
@@ -161,4 +174,12 @@ func workflowStarterOrNil(m *workflow.Manager) httpapi.WorkflowStarter {
 		return nil
 	}
 	return m
+}
+
+// collectorOrNil returns a nil interface when no investigator is configured.
+func collectorOrNil(c *investigate.Collector) httpapi.EvidenceCollector {
+	if c == nil {
+		return nil
+	}
+	return c
 }

@@ -377,6 +377,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/incidents/{id}/collect:
+    post:
+      operationId: collectEvidence
+      summary: Run read-only investigation for an incident
+      description: >
+        Runs the connected read-only investigators (Kubernetes, and later
+        Prometheus and GitHub) and records the gathered evidence on the
+        incident's timeline.
+      parameters:
+        - $ref: "#/components/parameters/IncidentId"
+      responses:
+        "202":
+          description: Evidence collected.
+        "400":
+          description: Incident has no service mapping.
+        "404":
+          description: Incident not found.
+        "503":
+          description: No investigation integrations connected.
   /api/incidents/{id}/events:
     get:
       operationId: listIncidentEvents

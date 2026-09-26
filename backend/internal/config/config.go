@@ -56,6 +56,16 @@ type Config struct {
 	TrueForgeURL string
 	// TrueForgeToken authenticates requests to TrueForge.
 	TrueForgeToken string
+
+	// K8sMCPURL / K8sMCPToken address the read-only Kubernetes MCP server.
+	K8sMCPURL   string
+	K8sMCPToken string
+	// PrometheusMCPURL / PrometheusMCPToken address the read-only Prometheus MCP server.
+	PrometheusMCPURL   string
+	PrometheusMCPToken string
+	// GitHubMCPURL / GitHubMCPToken address the read-only GitHub MCP server.
+	GitHubMCPURL   string
+	GitHubMCPToken string
 }
 
 // OIDCConfig holds the OpenID Connect settings for operator sign-in.
@@ -99,6 +109,12 @@ func Load() (Config, error) {
 		AlertEnvironmentLabel: getenv("KNULL_ALERT_ENVIRONMENT_LABEL", "environment"),
 		TrueForgeURL:          os.Getenv("KNULL_TRUEFORGE_URL"),
 		TrueForgeToken:        os.Getenv("KNULL_TRUEFORGE_TOKEN"),
+		K8sMCPURL:             os.Getenv("KNULL_K8S_MCP_URL"),
+		K8sMCPToken:           os.Getenv("KNULL_K8S_MCP_TOKEN"),
+		PrometheusMCPURL:      os.Getenv("KNULL_PROMETHEUS_MCP_URL"),
+		PrometheusMCPToken:    os.Getenv("KNULL_PROMETHEUS_MCP_TOKEN"),
+		GitHubMCPURL:          os.Getenv("KNULL_GITHUB_MCP_URL"),
+		GitHubMCPToken:        os.Getenv("KNULL_GITHUB_MCP_TOKEN"),
 	}
 
 	if d, err := durationSeconds("KNULL_SESSION_TTL_SECONDS"); err != nil {
