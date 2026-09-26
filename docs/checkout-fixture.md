@@ -31,3 +31,16 @@ policy must be extended with narrowly scoped rules for the selected sandbox
 load driver and Prometheus scraper before this fixture can be exercised.
 
 Do not treat a local process run or a mock as the live Task 18 verification.
+
+On 2026-09-26, the pinned fixture image in the dedicated Mumbai EKS sandbox
+was `079485644745.dkr.ecr.ap-south-1.amazonaws.com/knull/checkout-fixture@sha256:21c227e6d4d57c486ec88824dcf672d213daa68d37b63727c878fd5bc50696a5`.
+A restricted runner made separate `256Mi` and `1Gi` namespace runs. The
+baseline `/checkout` request ended with EOF and independent pod observation
+recorded two OOM kills with only one of two pods healthy. The candidate served
+20 of 20 requests with HTTP 200; both pods were healthy and neither was OOM
+killed. Both runs returned `checked` with `CleanupVerified=true`, and their
+namespaces were independently confirmed absent. The load used a Kubernetes
+API port-forward with a sandbox-only service-account token; port-forward may
+bypass ingress NetworkPolicy and is not evidence of ingress policy behavior.
+TrueForge-generated execution and sandbox-local Prometheus observations still
+require their own live verification before Task 18 can pass.
